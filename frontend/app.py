@@ -395,6 +395,7 @@ IV_DEFAULTS = {
     "iv_prefetch":     None,
     "iv_prefetch_sig": None,
     "iv_last_wait":    None,
+    "iv_skip_requested": False,
 }
 for _k, _v in IV_DEFAULTS.items():
     if _k not in st.session_state:
@@ -1146,10 +1147,16 @@ with tab_interview:
                     st.rerun()
 
             # ── Skip ──────────────────────────────────────────────────────
+            # Skipping means moving on without answering — it must actually
+            # advance to the next question, not just clear the (already empty)
+            # evaluation state. _advance_to_next_question is defined further
+            # down the script (next to the Next Question button), so we can't
+            # call it from here directly; the flag bridges to that point.
             if skip_clicked:
                 st.session_state["iv_eval_result"] = None
                 st.session_state["iv_eval_error"]  = None
                 st.session_state["iv_evaluated"]   = False
+                st.session_state["iv_skip_requested"] = True
 
             # ── Evaluation display ────────────────────────────────────────
             if st.session_state.get("iv_eval_result"):
@@ -1191,7 +1198,15 @@ with tab_interview:
             disabled=st.session_state.get("iv_interview_complete", False),
         )
 
-        if next_clicked and not st.session_state.get("iv_interview_complete", False):
+        def _advance_to_next_question():
+            """
+            Fetch and display the next question.
+
+            Shared by the "Next Question" button and "Skip" — skipping a
+            question is exactly this same advance, just without an evaluated
+            answer behind it (so no score gets added to score_history and the
+            adaptive engine simply sees one fewer data point for this turn).
+            """
             st.session_state["iv_error"]       = None
             st.session_state["iv_eval_result"] = None
             st.session_state["iv_eval_error"]  = None
@@ -1295,6 +1310,10 @@ with tab_interview:
                 except Exception as e:
                     st.session_state["iv_error"] = _friendly_http_error(e)
                     st.rerun()
+
+        skip_requested = st.session_state.pop("iv_skip_requested", False)
+        if (next_clicked or skip_requested) and not st.session_state.get("iv_interview_complete", False):
+            _advance_to_next_question()
 
         # ── Final Report section (Day 6) — shows after >=1 answer saved ──
         stored = st.session_state["iv_stored_count"]
