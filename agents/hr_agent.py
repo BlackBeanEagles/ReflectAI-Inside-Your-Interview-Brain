@@ -119,7 +119,7 @@ def generate_hr_question(context: str) -> str:
         return "Can you tell me about yourself and what motivates you professionally?"
 
     prompt = _build_prompt(context.strip())
-    raw_response = call_llm(prompt)
+    raw_response = call_llm(prompt, purpose="question")
 
     # If LLM utility returned an error string, pass it through without cleaning
     LLM_ERROR_PREFIXES = (

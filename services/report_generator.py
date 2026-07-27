@@ -18,6 +18,7 @@ Dependency: utils/llm.py (Ollama), services/session_manager.py (data source).
 
 import logging
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Tuple
 
 from utils.llm import call_llm
@@ -431,7 +432,7 @@ def _generate_llm_summary(data: Dict) -> str:
     Falls back to a template summary if LLM is unavailable.
     """
     prompt = _build_summary_prompt(data)
-    raw = call_llm(prompt)
+    raw = call_llm(prompt, purpose="report")
 
     if raw.startswith(LLM_ERROR_PREFIXES):
         logger.warning(
@@ -517,14 +518,22 @@ def generate_report(history: List[Dict]) -> Dict:
         scores["stress_score"] or 0,
     )
 
-    combined["summary"] = _generate_llm_summary(combined)
+    # The panel summary and the Week 5 cognitive block each make their own LLM
+    # call and neither depends on the other's output, so run them concurrently —
+    # report generation was previously paying for both round-trips back to back.
+    def _cognitive():
+        try:
+            cog = build_week5_cognitive_block(history, combined.get("behavior_summary", ""))
+            cog.pop("per_answer_impulsivity", None)
+            return cog
+        except Exception as exc:
+            logger.warning("report_generator: cognitive block skipped: %s", exc)
+            return None
 
-    try:
-        cog = build_week5_cognitive_block(history, combined.get("behavior_summary", ""))
-        cog.pop("per_answer_impulsivity", None)
-        combined["cognitive"] = cog
-    except Exception as exc:
-        logger.warning("report_generator: cognitive block skipped: %s", exc)
-        combined["cognitive"] = None
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        summary_future = pool.submit(_generate_llm_summary, combined)
+        cognitive_future = pool.submit(_cognitive)
+        combined["summary"] = summary_future.result()
+        combined["cognitive"] = cognitive_future.result()
 
     return combined

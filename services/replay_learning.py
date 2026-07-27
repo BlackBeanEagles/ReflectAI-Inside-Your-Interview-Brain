@@ -131,7 +131,7 @@ META JSON:
 {json.dumps(meta)}
 
 Write concise coaching prose. No bullet points."""
-    raw = call_llm(prompt)
+    raw = call_llm(prompt, purpose="coach")
     if raw.startswith(LLM_ERROR_PREFIXES):
         return (
             f"Score moved from {old_score:.1f} to {new_score:.1f}. "

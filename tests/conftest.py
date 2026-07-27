@@ -13,7 +13,9 @@ import pytest
 from unittest.mock import patch
 
 
-def _fake_llm(prompt: str) -> str:
+def _fake_llm(prompt: str, *args, **kwargs) -> str:
+    # Call sites pass ``purpose=`` (and may pass timeout/use_cache) to select a
+    # generation profile; the stub ignores them and matches on prompt content.
     pl = prompt.lower()
     if "score each" in pl or (
         "0 to 10" in pl and "strength" in pl and "weakness" in pl

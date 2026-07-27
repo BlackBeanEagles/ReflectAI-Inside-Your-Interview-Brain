@@ -12,9 +12,10 @@ All processing is delegated to the services and agents layers.
 """
 
 import logging
+import os
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from agents.stress_agent import generate_stress_question
 from agents.technical_agent import generate_technical_question
@@ -37,6 +38,13 @@ from services.resume_processor import process_resume
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Unbounded uploads/paste text can crash a resource-capped free-tier instance
+# (a large PDF eats RAM in pypdf; a huge pasted string gets embedded whole into
+# LLM prompts downstream). Both are rejected with a clear 413 instead of OOMing.
+MAX_UPLOAD_MB = float(os.getenv("MAX_UPLOAD_MB", "5"))
+MAX_UPLOAD_BYTES = int(MAX_UPLOAD_MB * 1024 * 1024)
+MAX_PASTE_CHARS = int(os.getenv("MAX_PASTE_CHARS", "20000"))
+
 
 @router.post("/parse-resume", response_model=ResumeParseResponse)
 async def parse_resume_endpoint(
@@ -57,8 +65,23 @@ async def parse_resume_endpoint(
 
     if file is not None:
         pdf_bytes = await file.read()
+        if len(pdf_bytes) > MAX_UPLOAD_BYTES:
+            logger.warning(
+                "parse-resume: rejected oversized upload — name='%s', size=%d bytes",
+                file.filename, len(pdf_bytes),
+            )
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Max upload size is {MAX_UPLOAD_MB:.0f}MB.",
+            )
         logger.info("parse-resume: PDF file received — name='%s', size=%d bytes", file.filename, len(pdf_bytes))
     elif text:
+        if len(text) > MAX_PASTE_CHARS:
+            logger.warning("parse-resume: rejected oversized pasted text — length=%d chars", len(text))
+            raise HTTPException(
+                status_code=413,
+                detail=f"Pasted text too long. Max is {MAX_PASTE_CHARS} characters.",
+            )
         logger.info("parse-resume: Text input received — length=%d chars", len(text))
     else:
         logger.warning("parse-resume: No input provided — returning empty output.")

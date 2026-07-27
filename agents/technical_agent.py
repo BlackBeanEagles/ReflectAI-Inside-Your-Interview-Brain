@@ -188,7 +188,7 @@ def generate_technical_question(
         logger.info("Technical Agent (skill-based) — skill: '%s'", skill)
         prompt = _build_skill_prompt(skill, difficulty)
 
-    raw_response = call_llm(prompt)
+    raw_response = call_llm(prompt, purpose="question")
 
     # Surface LLM errors without modification
     if raw_response.startswith(LLM_ERROR_PREFIXES):

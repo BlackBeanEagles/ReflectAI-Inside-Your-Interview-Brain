@@ -19,22 +19,74 @@ Every evaluated answer is stored as one "interaction" with this structure:
     }
 
 Sessions are keyed by a UUID session_id.
-Storage is in-memory (dict) — fast, simple, sufficient for Week 3.
+Storage is in-memory (dict) — fast, simple, sufficient for a single-process
+deployment. Two things a hosted, publicly-reachable instance needs that a
+local dev run didn't:
+
+    1. Sessions never expired. On a long-running free-tier host, every visitor
+       who ever loads the page leaves a session in memory forever — an
+       unbounded, permanent memory leak. SESSION_TTL_MINUTES now evicts idle
+       sessions, and MAX_SESSIONS caps total memory use by dropping the oldest
+       session once the cap is hit (values are load-bearing, not decorative).
+    2. All state lives in one process's memory, so this only works correctly
+       with a single worker/instance. Scaling to multiple instances would need
+       a shared store (Redis, a database) — out of scope while running free.
 
 Day 6 (report_generator.py) reads from this module to build the final report.
 """
 
-import uuid
 import logging
+import os
+import threading
+import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+SESSION_TTL_MINUTES = int(os.getenv("SESSION_TTL_MINUTES", "180"))
+MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "500"))
+
 # ── In-memory store ────────────────────────────────────────────────────────────
 # session_id (str) → list of interaction dicts
+# session_id (str) → last-touched monotonic-ish timestamp (for eviction)
 
 _sessions: Dict[str, List[Dict]] = {}
+_last_touched: Dict[str, float] = {}
+_lock = threading.Lock()
+
+
+def _now() -> float:
+    return datetime.now(timezone.utc).timestamp()
+
+
+def _evict_expired_locked() -> None:
+    """Drop sessions idle longer than SESSION_TTL_MINUTES. Caller holds _lock."""
+    cutoff = _now() - (SESSION_TTL_MINUTES * 60)
+    expired = [sid for sid, ts in _last_touched.items() if ts < cutoff]
+    for sid in expired:
+        _sessions.pop(sid, None)
+        _last_touched.pop(sid, None)
+    if expired:
+        logger.info("session_manager: Evicted %d expired session(s).", len(expired))
+
+
+def _evict_oldest_if_over_capacity_locked() -> None:
+    """Caller holds _lock."""
+    while len(_sessions) > MAX_SESSIONS:
+        oldest_sid = min(_last_touched, key=_last_touched.get, default=None)
+        if oldest_sid is None:
+            break
+        _sessions.pop(oldest_sid, None)
+        _last_touched.pop(oldest_sid, None)
+        logger.warning(
+            "session_manager: MAX_SESSIONS (%d) exceeded — evicted oldest session %s.",
+            MAX_SESSIONS, oldest_sid,
+        )
+
+
+def _touch_locked(session_id: str) -> None:
+    _last_touched[session_id] = _now()
 
 
 # ── Session lifecycle ──────────────────────────────────────────────────────────
@@ -47,7 +99,11 @@ def create_session() -> str:
         session_id (UUID string) — store this on the client side.
     """
     session_id = str(uuid.uuid4())
-    _sessions[session_id] = []
+    with _lock:
+        _evict_expired_locked()
+        _sessions[session_id] = []
+        _touch_locked(session_id)
+        _evict_oldest_if_over_capacity_locked()
     logger.info("session_manager: Created session %s", session_id)
     return session_id
 
@@ -57,13 +113,16 @@ def reset_session(session_id: str) -> None:
     Clear all interactions for the given session (keeps the session_id alive).
     Creates the session if it does not exist.
     """
-    _sessions[session_id] = []
+    with _lock:
+        _sessions[session_id] = []
+        _touch_locked(session_id)
     logger.info("session_manager: Reset session %s", session_id)
 
 
 def session_exists(session_id: str) -> bool:
     """Return True if the session_id is known to this store."""
-    return session_id in _sessions
+    with _lock:
+        return session_id in _sessions
 
 
 # ── Interaction storage ────────────────────────────────────────────────────────
@@ -96,12 +155,6 @@ def add_interaction(
     Returns:
         The stored interaction dict (including timestamp).
     """
-    if session_id not in _sessions:
-        logger.warning(
-            "session_manager: Unknown session %s — creating automatically.", session_id
-        )
-        _sessions[session_id] = []
-
     interaction: Dict = {
         "question":    question,
         "answer":      answer,
@@ -114,13 +167,21 @@ def add_interaction(
     if response_time_seconds is not None:
         interaction["response_time_seconds"] = float(response_time_seconds)
 
-    _sessions[session_id].append(interaction)
+    with _lock:
+        if session_id not in _sessions:
+            logger.warning(
+                "session_manager: Unknown session %s — creating automatically.", session_id
+            )
+            _sessions[session_id] = []
+        _sessions[session_id].append(interaction)
+        _touch_locked(session_id)
+        total = len(_sessions[session_id])
 
     logger.info(
         "session_manager: Added interaction to session %s "
         "(total=%d, round=%s, score=%.1f)",
         session_id,
-        len(_sessions[session_id]),
+        total,
         round_type,
         final_score,
     )
@@ -135,9 +196,17 @@ def get_session(session_id: str) -> List[Dict]:
     Return a copy of the full interaction history for the given session.
     Returns an empty list if the session_id is not found.
     """
-    return list(_sessions.get(session_id, []))
+    with _lock:
+        return list(_sessions.get(session_id, []))
 
 
 def get_session_count(session_id: str) -> int:
     """Return the number of interactions stored in the session."""
-    return len(_sessions.get(session_id, []))
+    with _lock:
+        return len(_sessions.get(session_id, []))
+
+
+def active_session_count() -> int:
+    """Return the number of non-expired sessions currently held in memory."""
+    with _lock:
+        return len(_sessions)

@@ -379,7 +379,7 @@ Avoid repeating JSON keys verbatim; write flowing prose. Under 120 words.
 DATA JSON:
 {json.dumps(payload, indent=2)}
 """
-    raw = call_llm(prompt)
+    raw = call_llm(prompt, purpose="coach")
     if raw.startswith(LLM_ERROR_PREFIXES):
         return (
             f"Thinking style leans '{style}' with fingerprint depth "

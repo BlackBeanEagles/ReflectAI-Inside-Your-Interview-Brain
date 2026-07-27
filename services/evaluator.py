@@ -231,7 +231,14 @@ def _too_short_result(answer_type: str) -> Dict:
 
 
 def _llm_error_result(answer_type: str, error_msg: str) -> Dict:
-    """Return a result indicating LLM unavailability."""
+    """
+    Return a result indicating LLM unavailability.
+
+    The generic advice line used to hardcode "ensure Ollama is running", which
+    is wrong in Groq mode (a hosted deployment has no Ollama at all) — the
+    underlying error_msg already says exactly what's wrong for whichever
+    provider is active, so this just points the user at it.
+    """
     dim_keys = get_criteria_names(answer_type)
     return {
         "scores":      {k: 0 for k in dim_keys},
@@ -240,7 +247,7 @@ def _llm_error_result(answer_type: str, error_msg: str) -> Dict:
         "feedback": {
             "strength":    "Evaluation could not be completed.",
             "weakness":    error_msg,
-            "improvement": "Please ensure Ollama is running and try again.",
+            "improvement": "See the message above and try again in a moment.",
         },
         "error": True,
     }
@@ -303,7 +310,7 @@ def evaluate_answer(
 
     # ── Call LLM ─────────────────────────────────────────────────────────
     prompt = _build_evaluation_prompt(question, answer, answer_type, coaching_hint)
-    raw_response = call_llm(prompt)
+    raw_response = call_llm(prompt, purpose="evaluation")
 
     if raw_response.startswith(LLM_ERROR_PREFIXES):
         logger.error("Evaluator: LLM error — %s", raw_response)

@@ -137,7 +137,7 @@ def generate_stress_question(
         question_type = random.choice(QUESTION_TYPES)
 
     prompt = _build_prompt(skills=skills, difficulty=difficulty, question_type=question_type)
-    raw_response = call_llm(prompt)
+    raw_response = call_llm(prompt, purpose="question")
 
     if raw_response.startswith(LLM_ERROR_PREFIXES):
         logger.error("Stress Agent LLM error: %s", raw_response)

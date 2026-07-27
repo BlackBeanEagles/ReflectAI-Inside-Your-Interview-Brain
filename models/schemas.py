@@ -214,6 +214,17 @@ class EvaluateRequest(BaseModel):
             return "technical"
         return v
 
+    @field_validator("answer")
+    @classmethod
+    def answer_length_cap(cls, v: str) -> str:
+        # An unbounded answer gets embedded whole into the evaluation prompt —
+        # a large paste inflates LLM cost/latency and, on Groq, token usage
+        # against a free-tier quota shared by every visitor.
+        MAX_ANSWER_CHARS = 6000
+        if v and len(v) > MAX_ANSWER_CHARS:
+            raise ValueError(f"Answer too long (max {MAX_ANSWER_CHARS} characters).")
+        return v
+
 
 class FeedbackDetail(BaseModel):
     """Structured 3-part feedback from the evaluation."""
