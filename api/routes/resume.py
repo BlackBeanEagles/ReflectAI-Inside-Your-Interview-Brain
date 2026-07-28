@@ -30,6 +30,7 @@ from models.schemas import (
     TechnicalQuestionRequest,
     TechnicalQuestionResponse,
 )
+from services import db, session_manager
 from services.data_cleaner import clean_resume_data
 from services.decision_engine import decide_next_step
 from services.interview_service import run_interview_step
@@ -50,6 +51,7 @@ MAX_PASTE_CHARS = int(os.getenv("MAX_PASTE_CHARS", "20000"))
 async def parse_resume_endpoint(
     text: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
+    session_id: Optional[str] = Form(None),
 ):
     """
     POST /parse-resume
@@ -57,6 +59,10 @@ async def parse_resume_endpoint(
     Accepts either:
         - text (form field): plain text resume (copy-paste)
         - file (upload):     PDF resume file
+        - session_id (form field, optional): when provided and persistent
+          storage is configured (DATABASE_URL), the parsed resume is saved
+          tied to this session_id. Omitting it just skips persistence — the
+          endpoint behaves exactly as before.
 
     Returns both raw parsed data and cleaned/normalized data.
     Flow: Input → process_resume() → clean_resume_data() → Response
@@ -88,6 +94,10 @@ async def parse_resume_endpoint(
 
     raw = process_resume(text=text or None, pdf_bytes=pdf_bytes)
     cleaned = clean_resume_data(raw)
+
+    sid = (session_id or "").strip()
+    if sid and session_manager.has_store_consent(sid):
+        db.save_resume(sid, text, cleaned)
 
     return ResumeParseResponse(raw=raw, cleaned=cleaned)
 

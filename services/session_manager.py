@@ -53,6 +53,7 @@ MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "500"))
 
 _sessions: Dict[str, List[Dict]] = {}
 _last_touched: Dict[str, float] = {}
+_store_consent: Dict[str, bool] = {}
 _lock = threading.Lock()
 
 
@@ -67,6 +68,7 @@ def _evict_expired_locked() -> None:
     for sid in expired:
         _sessions.pop(sid, None)
         _last_touched.pop(sid, None)
+        _store_consent.pop(sid, None)
     if expired:
         logger.info("session_manager: Evicted %d expired session(s).", len(expired))
 
@@ -79,6 +81,7 @@ def _evict_oldest_if_over_capacity_locked() -> None:
             break
         _sessions.pop(oldest_sid, None)
         _last_touched.pop(oldest_sid, None)
+        _store_consent.pop(oldest_sid, None)
         logger.warning(
             "session_manager: MAX_SESSIONS (%d) exceeded — evicted oldest session %s.",
             MAX_SESSIONS, oldest_sid,
@@ -91,9 +94,16 @@ def _touch_locked(session_id: str) -> None:
 
 # ── Session lifecycle ──────────────────────────────────────────────────────────
 
-def create_session() -> str:
+def create_session(store_consent: bool = False) -> str:
     """
     Create a new empty session.
+
+    Args:
+        store_consent: Whether the user explicitly agreed to have their
+            resume/answers persisted to the database (see services/db.py).
+            Defaults to False — persistence requires an opt-in, enforced here
+            rather than trusted to the frontend, since add_interaction() is
+            also called directly by API clients.
 
     Returns:
         session_id (UUID string) — store this on the client side.
@@ -102,10 +112,19 @@ def create_session() -> str:
     with _lock:
         _evict_expired_locked()
         _sessions[session_id] = []
+        _store_consent[session_id] = bool(store_consent)
         _touch_locked(session_id)
         _evict_oldest_if_over_capacity_locked()
-    logger.info("session_manager: Created session %s", session_id)
+    logger.info(
+        "session_manager: Created session %s (store_consent=%s)", session_id, store_consent
+    )
     return session_id
+
+
+def has_store_consent(session_id: str) -> bool:
+    """Whether this session opted in to persistent storage."""
+    with _lock:
+        return _store_consent.get(session_id, False)
 
 
 def reset_session(session_id: str) -> None:

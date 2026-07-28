@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from api.routes import interview, resume, evaluation, session
+from services import db
 from utils import llm
 
 try:
@@ -46,6 +47,7 @@ async def lifespan(_app: FastAPI):
     serving immediately.
     """
     llm.warmup(blocking=False)
+    db.init_db()
     yield
 
 
@@ -141,4 +143,5 @@ def health():
         ),
         "model_loaded": ready["model_loaded"],
         "detail": ready.get("detail"),
+        "storage": "postgres" if db.is_enabled() else "in-memory-only",
     }

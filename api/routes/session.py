@@ -21,6 +21,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 from models.schemas import (
+    SessionStartRequest,
     SessionStartResponse,
     AddInteractionRequest,
     SessionHistoryResponse,
@@ -30,7 +31,7 @@ from models.schemas import (
     ReplayCompareRequest,
     ReplayCompareResponse,
 )
-from services import session_manager
+from services import db, session_manager
 from services.report_generator import generate_report
 from services.replay_learning import compare_answer_versions
 
@@ -41,14 +42,17 @@ router = APIRouter(prefix="/session", tags=["Session"])
 # ─── POST /session/start ──────────────────────────────────────────────────────
 
 @router.post("/start", response_model=SessionStartResponse)
-def start_session():
+def start_session(request: SessionStartRequest = SessionStartRequest()):
     """
     Create a new empty interview session.
+
+    request.store_consent must be True for anything in this session to be
+    persisted to the database — see SessionStartRequest and PRIVACY.md.
 
     Returns a session_id that the frontend must store and include in all
     subsequent session calls.
     """
-    session_id = session_manager.create_session()
+    session_id = session_manager.create_session(store_consent=request.store_consent)
     logger.info("session: Created session %s", session_id)
     return SessionStartResponse(session_id=session_id)
 
@@ -77,6 +81,8 @@ def add_interaction(request: AddInteractionRequest):
         },
         response_time_seconds=request.response_time_seconds,
     )
+    if session_manager.has_store_consent(request.session_id):
+        db.save_interaction(request.session_id, interaction)
 
     count = session_manager.get_session_count(request.session_id)
     logger.info(
@@ -157,6 +163,8 @@ def generate_final_report(session_id: str):
     )
 
     report = generate_report(history)
+    if session_manager.has_store_consent(session_id):
+        db.save_report(session_id, report)
 
     return ReportResponse(
         overall_score   = report.get("overall_score")   or 0.0,

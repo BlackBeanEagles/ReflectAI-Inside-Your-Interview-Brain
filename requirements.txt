@@ -27,6 +27,7 @@ protobuf==7.34.1
 pyarrow==23.0.1
 pydantic==2.13.0
 pydantic_core==2.46.0
+psycopg[binary,pool]==3.2.10
 pydeck==0.9.1
 python-dateutil==2.9.0.post0
 pypdf==6.10.2

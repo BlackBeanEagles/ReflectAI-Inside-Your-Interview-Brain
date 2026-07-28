@@ -252,6 +252,17 @@ class EvaluateResponse(BaseModel):
 
 # ─── Week 3 Day 5 — Session Management ───────────────────────────────────────
 
+class SessionStartRequest(BaseModel):
+    """
+    Input for POST /session/start.
+
+    store_consent: True only if the user explicitly opted in to having their
+    resume and answers persisted to the database (see services/db.py and
+    PRIVACY.md). Defaults to False — no persistence without opt-in.
+    """
+    store_consent: bool = False
+
+
 class SessionStartResponse(BaseModel):
     """Response from POST /session/start — returns the new session_id."""
     session_id: str
