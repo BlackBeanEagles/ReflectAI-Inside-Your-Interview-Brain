@@ -472,14 +472,15 @@ tab_interview, tab_resume = st.tabs(["🎯 Interview Session", "📄 Resume Anal
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _call_parse(text=None, file=None):
+def _call_parse(text=None, file=None, session_id=None):
+    data = {"session_id": session_id} if session_id else {}
     if file is not None:
         r = _http().post(f"{BACKEND_BASE}/parse-resume",
                          files={"file": (file.name, file.getvalue(), "application/pdf")},
-                         timeout=60)
+                         data=data, timeout=60)
     else:
         r = _http().post(f"{BACKEND_BASE}/parse-resume",
-                         data={"text": text}, timeout=60)
+                         data={**data, "text": text}, timeout=60)
     r.raise_for_status()
     d = r.json()
     return d["raw"], d["cleaned"]
@@ -620,8 +621,12 @@ def _call_evaluate(question, answer, answer_type, coaching_hint=None):
     return r.json()
 
 
-def _call_session_start():
-    r = _http().post(f"{BACKEND_BASE}/session/start", timeout=10)
+def _call_session_start(store_consent=False):
+    r = _http().post(
+        f"{BACKEND_BASE}/session/start",
+        json={"store_consent": bool(store_consent)},
+        timeout=10,
+    )
     r.raise_for_status()
     return r.json()["session_id"]
 
@@ -968,6 +973,20 @@ with tab_interview:
         else:
             resume_file = st.file_uploader("Upload resume PDF", type=["pdf"], key="iv_resume_file")
 
+        # Persistence is only offered when the backend actually has a database
+        # configured — asking for consent to something that's a no-op would be
+        # confusing. See services/db.py and PRIVACY.md.
+        _health = _backend_health() or {}
+        storage_enabled = _health.get("storage") == "postgres"
+        store_consent = False
+        if storage_enabled:
+            store_consent = st.checkbox(
+                "Save my resume and interview answers so I can review them later "
+                "(otherwise everything is discarded when this session ends)",
+                value=False,
+                key="iv_store_consent",
+            )
+
         if st.button("🚀  Start Interview", type="primary", use_container_width=True, key="iv_start"):
             has_input = (resume_text and resume_text.strip()) or resume_file
             if not has_input:
@@ -975,12 +994,14 @@ with tab_interview:
             else:
                 with st.spinner("Parsing resume..."):
                     try:
+                        # Session is created first so the resume parse can be
+                        # tied to it (and persisted, if consent was given).
+                        session_id = _call_session_start(store_consent=store_consent)
                         _, cleaned = _call_parse(
                             text=resume_text.strip() if resume_text else None,
                             file=resume_file,
+                            session_id=session_id,
                         )
-                        # Create backend session (Day 5)
-                        session_id = _call_session_start()
 
                         # Reset all defaults
                         for k in list(defaults.keys()):

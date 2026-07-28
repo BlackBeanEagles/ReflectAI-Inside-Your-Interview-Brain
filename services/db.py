@@ -30,6 +30,15 @@ def is_enabled() -> bool:
     return bool(DATABASE_URL)
 
 
+# A slow/unreachable database must degrade to "skip persistence" in a couple
+# of seconds, not hang the request — connect_timeout bounds how long a single
+# TCP/handshake attempt can take, and the pool's own `timeout` bounds how long
+# a caller waits for a connection to become available at all (min_size=0 and
+# open=False mean the pool never blocks trying to eagerly open connections;
+# it only tries when something actually asks for one).
+DB_CONNECT_TIMEOUT_S = int(os.getenv("DB_CONNECT_TIMEOUT_S", "3"))
+
+
 def _get_pool():
     """Lazily create the connection pool on first use."""
     global _pool
@@ -39,7 +48,15 @@ def _get_pool():
         return None
     try:
         from psycopg_pool import ConnectionPool
-        _pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=5, open=True)
+        _pool = ConnectionPool(
+            DATABASE_URL,
+            min_size=0,
+            max_size=5,
+            open=False,
+            timeout=DB_CONNECT_TIMEOUT_S,
+            kwargs={"connect_timeout": DB_CONNECT_TIMEOUT_S},
+        )
+        _pool.open(wait=False)
         return _pool
     except Exception:
         logger.exception("db: failed to create connection pool — persistence disabled for this process.")

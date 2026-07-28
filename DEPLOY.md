@@ -84,6 +84,26 @@ cost:
   this, sessions from every visitor who ever loaded the page would accumulate
   forever and eventually run the process out of memory.
 
+## Optional: permanent storage with Neon (free Postgres)
+
+By default nothing survives a backend restart — resumes and answers live only
+in memory for the session. To save them permanently instead:
+
+1. Go to https://neon.tech, sign up (no card required), create a project.
+2. Copy the connection string it gives you (starts with `postgresql://`).
+3. On Render → your service → **Environment**, add:
+   ```
+   DATABASE_URL=<the connection string from Neon>
+   ```
+4. Redeploy. `/health` should now show `"storage":"postgres"` instead of
+   `"storage":"in-memory-only"`. Tables are created automatically on startup.
+
+With this set, the frontend shows a consent checkbox on the setup screen
+("Save my resume and interview answers...") — nothing is persisted unless a
+user explicitly checks it, even with `DATABASE_URL` configured. See
+[PRIVACY.md](PRIVACY.md) for exactly what gets stored and your responsibilities
+before pointing real users at a deployment with this enabled.
+
 ## Known limitation: single instance only
 
 Session state lives in the backend process's memory (see
