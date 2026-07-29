@@ -73,6 +73,13 @@ class ATSFormatCheck(BaseModel):
     detail: str
 
 
+class ATSImprovementItem(BaseModel):
+    priority: str   # "high" / "medium" / "low"
+    category: str   # "Format" / "Keywords" / "Strategy"
+    action: str
+    reason: str
+
+
 class ATSScoreResponse(BaseModel):
     """
     Output schema for /ats-score.
@@ -88,6 +95,7 @@ class ATSScoreResponse(BaseModel):
     matched_keywords: List[ATSKeywordItem]
     missing_keywords: List[ATSKeywordItem]
     format_checks: List[ATSFormatCheck]
+    improvement_plan: List[ATSImprovementItem]
     methodology: str
 
 

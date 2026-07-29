@@ -1695,6 +1695,27 @@ with tab_ats:
                 unsafe_allow_html=True,
             )
 
+        plan = res.get("improvement_plan", [])
+        if plan:
+            st.markdown("")
+            st.markdown("**📈 How to improve this score**")
+            st.caption(
+                "Ranked by impact — each item comes directly from the matched/missing "
+                "keywords and format checks above, not a separate guess."
+            )
+            _prio_cls = {"high": "report-weakness", "medium": "report-pattern", "low": "report-rec"}
+            _prio_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}
+            for item in plan:
+                p = item.get("priority", "medium")
+                st.markdown(
+                    f'<div class="report-item {_prio_cls.get(p, "report-rec")}">'
+                    f'<strong>{_prio_icon.get(p, "🟡")} [{item.get("category","")}] '
+                    f'{item.get("priority","").upper()}</strong> — {item.get("action","")}'
+                    f'<br><span style="opacity:0.8;font-size:0.85em;">{item.get("reason","")}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
 
 # ─── Footer ──────────────────────────────────────────────────────────────────
 st.divider()

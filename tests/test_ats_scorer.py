@@ -119,3 +119,44 @@ def test_required_language_weighs_more_than_preferred_language():
     result = score_resume_against_job("no overlap", jd)
     weights = {m["keyword"]: m["weight"] for m in result["missing_keywords"]}
     assert weights["docker"] > weights["kubernetes"]
+
+
+def test_cue_phrases_and_filler_are_not_treated_as_keywords():
+    """Regression: 'need'/'nice-to-have' (the cue phrases themselves) leaked in as fake keywords."""
+    jd = "We need a Python Developer. Docker is required. Kubernetes is a nice-to-have."
+    result = score_resume_against_job("Skills: Python", jd)
+    all_keywords = {m["keyword"] for m in result["missing_keywords"]} | {m["keyword"] for m in result["matched_keywords"]}
+    assert "need" not in all_keywords
+    assert "nice-to-have" not in all_keywords
+    assert not any("need " in kw or kw.endswith(" need") for kw in all_keywords)
+
+
+def test_improvement_plan_prioritizes_failed_checks_and_required_keywords_first():
+    jd = "Docker experience is required. Kubernetes is a nice-to-have."
+    result = score_resume_against_job("no overlap at all, no email, no sections", jd)
+    plan = result["improvement_plan"]
+    assert len(plan) > 0
+    # High priority items must come before low priority items.
+    priorities = [item["priority"] for item in plan]
+    assert priorities.index("high") < (priorities.index("low") if "low" in priorities else len(priorities))
+    high_actions = " ".join(i["action"] for i in plan if i["priority"] == "high")
+    assert "docker" in high_actions.lower()
+
+
+def test_improvement_plan_is_empty_ish_for_a_near_perfect_match():
+    jd = "Docker experience required."
+    resume = """
+    Skills: Docker, Python, Django, PostgreSQL, REST API design, Kubernetes,
+    Git, Linux, CI/CD pipelines, unit testing, code review
+    Experience: Five years building and deploying containerized backend
+    services with Docker in production, working closely with cross
+    functional teams to ship reliable, well-tested features on schedule.
+    Designed and maintained REST APIs used by millions of requests per day,
+    wrote extensive automated test suites, mentored junior engineers, and
+    led the migration of a monolithic application into a set of Docker
+    containers orchestrated in a staging environment before every release.
+    Email: a@b.com
+    """
+    result = score_resume_against_job(resume, jd)
+    high_priority = [i for i in result["improvement_plan"] if i["priority"] == "high"]
+    assert high_priority == []

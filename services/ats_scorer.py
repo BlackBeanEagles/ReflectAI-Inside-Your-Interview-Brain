@@ -65,6 +65,7 @@ resume candidates plus etc hiring hire hires hired seeking seek employer
 employers benefits salary equal employment diversity inclusive environment
 culture mission vision growing fast paced dynamic passionate motivated
 self starter detail oriented environment nice bonus essential minimum
+need needs needed nice-to-have nice-to-haves must-have must-haves ideally
 """.split())
 
 # ── Synonym / abbreviation folding ─────────────────────────────────────────
@@ -257,6 +258,96 @@ def _format_checks(resume_text: str, is_from_pdf: bool) -> List[Dict]:
     return checks
 
 
+_FORMAT_FIX_ACTIONS = {
+    "Contact info detectable": "Add a clearly formatted email address near the top of your resume "
+                                "(not inside an image or text box — plain text only).",
+    "Skills section present": "Add an explicit 'Skills' section header listing your technical skills.",
+    "Experience section present": "Add an explicit 'Experience' (or 'Work History') section header.",
+    "PDF text is extractable": "Re-export from a text-based document (Word/Google Docs) rather than a "
+                                "scan, and avoid multi-column layouts, tables, or text boxes — ATS "
+                                "parsers read PDFs top-to-bottom, left-to-right as a single column.",
+}
+
+
+def _format_fix_action(check_name: str, detail: str) -> str:
+    if check_name == "Reasonable length":
+        if "too short" in detail:
+            return "Expand your resume with more concrete detail on your experience and skills — " \
+                   "there's currently too little text for an ATS to find meaningful signal."
+        if "too long" in detail:
+            return "Trim your resume — very long documents get truncated by some ATS parsers before " \
+                   "they ever reach the keyword-matching step."
+        return "Adjust your resume length."
+    return _FORMAT_FIX_ACTIONS.get(check_name, "Address this format issue.")
+
+
+def generate_improvement_plan(result: Dict) -> List[Dict]:
+    """
+    Turn a score_resume_against_job() result into concrete, prioritized next
+    steps — derived directly from the same failed checks and missing
+    keywords already in the result, not a freeform LLM suggestion. Every
+    action item traces back to a specific data point the user can verify
+    themselves in the rest of the response.
+    """
+    plan: List[Dict] = []
+
+    # Format fixes first — these are mechanical, verifiable, and often what's
+    # silently tanking a score before keyword matching even matters.
+    for check in result.get("format_checks", []):
+        if not check.get("passed"):
+            plan.append({
+                "priority": "high",
+                "category": "Format",
+                "action": _format_fix_action(check["name"], check.get("detail", "")),
+                "reason": check.get("detail", ""),
+            })
+
+    missing = result.get("missing_keywords", [])
+    high = [m["keyword"] for m in missing if m["weight"] >= 1.5]
+    medium = [m["keyword"] for m in missing if 0.9 <= m["weight"] < 1.5]
+    low = [m["keyword"] for m in missing if m["weight"] < 0.9]
+
+    if high:
+        plan.append({
+            "priority": "high",
+            "category": "Keywords",
+            "action": f"Work in these terms if they genuinely apply to you: {', '.join(high[:8])}.",
+            "reason": "This job posting explicitly marks these as required — resumes missing "
+                      "required terms are the most common reason ATS filters reject a candidate "
+                      "before a human ever sees the resume.",
+        })
+    if medium:
+        plan.append({
+            "priority": "medium",
+            "category": "Keywords",
+            "action": f"Consider adding: {', '.join(medium[:8])}.",
+            "reason": "These terms appear in the job description but weren't found anywhere in "
+                      "your resume text.",
+        })
+    if low:
+        plan.append({
+            "priority": "low",
+            "category": "Keywords",
+            "action": f"Optional, lower-impact additions: {', '.join(low[:8])}.",
+            "reason": "The posting frames these as bonus/nice-to-have rather than required.",
+        })
+
+    if result.get("keyword_match_score", 0) < 40:
+        plan.append({
+            "priority": "high",
+            "category": "Strategy",
+            "action": "Tailor this resume specifically to this posting rather than reusing one "
+                      "generic version — mirror the exact terminology the posting uses for your "
+                      "skills and past work.",
+            "reason": f"Only {result.get('keyword_match_score', 0):.0f}% keyword overlap with this "
+                      f"specific job description.",
+        })
+
+    order = {"high": 0, "medium": 1, "low": 2}
+    plan.sort(key=lambda p: order.get(p["priority"], 3))
+    return plan
+
+
 def score_resume_against_job(
     resume_text: str,
     job_description: str,
@@ -315,7 +406,7 @@ def score_resume_against_job(
     missing.sort(key=lambda x: -x["weight"])
     matched.sort(key=lambda x: -x["weight"])
 
-    return {
+    result = {
         "overall_score": overall,
         "rating": rating,
         "keyword_match_score": keyword_score,
@@ -333,3 +424,5 @@ def score_resume_against_job(
             "same score."
         ),
     }
+    result["improvement_plan"] = generate_improvement_plan(result)
+    return result
