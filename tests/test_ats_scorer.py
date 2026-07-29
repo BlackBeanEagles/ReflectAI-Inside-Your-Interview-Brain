@@ -83,3 +83,39 @@ def test_overall_score_is_bounded_0_to_100():
     assert 0 <= result["overall_score"] <= 100
     assert 0 <= result["keyword_match_score"] <= 100
     assert 0 <= result["format_score"] <= 100
+
+
+def test_generic_job_posting_boilerplate_is_not_flagged_as_a_missing_keyword():
+    """Regression: 'hiring' showed up as a 'missing keyword' — that's noise, not a skill."""
+    jd = "We are hiring a Python Developer. Join our growing, passionate team!"
+    result = score_resume_against_job("Skills: Python\nEmail: a@b.com", jd)
+    keywords = {m["keyword"] for m in result["missing_keywords"]} | {m["keyword"] for m in result["matched_keywords"]}
+    assert "hiring" not in keywords
+    assert "join" not in keywords
+
+
+def test_false_plural_words_are_not_mangled():
+    """Regression: 'plus' was being stripped to 'plu' by naive pluralization."""
+    jd = "Kubernetes experience is a plus. Prior work with a strong focus on uptime and status monitoring is required."
+    result = score_resume_against_job("no relevant overlap", jd)
+    all_keywords = {m["keyword"] for m in result["missing_keywords"]} | {m["keyword"] for m in result["matched_keywords"]}
+    for bad in ("plu", "focu", "statu"):
+        assert bad not in all_keywords
+
+
+def test_common_tech_synonyms_are_matched_as_equivalent():
+    """JS/JavaScript, Postgres/PostgreSQL, K8s/Kubernetes are the same skill."""
+    jd = "Looking for a developer with strong JavaScript and PostgreSQL skills. Kubernetes experience is a plus."
+    resume = "Skills: JS, Postgres, K8s\nExperience: Built apps with JS and Postgres.\nEmail: a@b.com"
+    result = score_resume_against_job(resume, jd)
+    matched = {m["keyword"] for m in result["matched_keywords"]}
+    assert "javascript" in matched
+    assert "postgresql" in matched
+    assert "kubernetes" in matched
+
+
+def test_required_language_weighs_more_than_preferred_language():
+    jd = "Docker experience is required. Kubernetes experience is a nice-to-have."
+    result = score_resume_against_job("no overlap", jd)
+    weights = {m["keyword"]: m["weight"] for m in result["missing_keywords"]}
+    assert weights["docker"] > weights["kubernetes"]

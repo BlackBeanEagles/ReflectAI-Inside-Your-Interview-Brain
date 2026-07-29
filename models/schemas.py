@@ -64,7 +64,7 @@ class ResumeParseResponse(BaseModel):
 
 class ATSKeywordItem(BaseModel):
     keyword: str
-    weight: int
+    weight: float
 
 
 class ATSFormatCheck(BaseModel):

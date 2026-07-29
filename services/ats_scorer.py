@@ -19,6 +19,19 @@ This module reproduces that mechanism directly and deterministically: the
 same resume + job description always produces the same score, and every
 point of the score traces back to a specific keyword match or format check
 that's returned in the response — nothing is a black box.
+
+Two things real ATS/resume-screening tools do that a naive keyword-count
+misses, both implemented here:
+
+    - Required vs. preferred weighting: a job posting's "must have Docker"
+      matters far more than its "nice to have Docker" — keywords found in a
+      sentence with required/must-have language are weighted ~1.6x; ones in
+      a preferred/bonus/nice-to-have sentence are weighted ~0.6x.
+    - Common synonym/abbreviation folding: "JS" and "JavaScript", "Postgres"
+      and "PostgreSQL", "K8s" and "Kubernetes" are the same skill and are
+      matched as such via a curated alias table. This table is necessarily
+      incomplete — it is not a licensed skills taxonomy — but it removes the
+      most common false "missing" flags that come purely from wording.
 """
 
 import re
@@ -48,10 +61,57 @@ responsibilities responsible required requirements requirement preferred
 qualifications qualification skills skill knowledge understanding demonstrated
 excellent strong good great high highly new join looking candidate ideal
 opportunity company job description position apply application please
-resume candidates plus etc
+resume candidates plus etc hiring hire hires hired seeking seek employer
+employers benefits salary equal employment diversity inclusive environment
+culture mission vision growing fast paced dynamic passionate motivated
+self starter detail oriented environment nice bonus essential minimum
 """.split())
 
+# ── Synonym / abbreviation folding ─────────────────────────────────────────
+# Curated common tech aliases, not a licensed skills taxonomy — this removes
+# the most frequent false "missing keyword" flags caused purely by wording
+# (JD says "JavaScript", resume says "JS"), not an exhaustive equivalence.
+_SYNONYMS: Dict[str, str] = {
+    "js": "javascript", "javascript": "javascript",
+    "ts": "typescript", "typescript": "typescript",
+    "postgres": "postgresql", "postgresql": "postgresql", "psql": "postgresql",
+    "k8s": "kubernetes", "kubernetes": "kubernetes",
+    "reactjs": "react", "react.js": "react", "react": "react",
+    "vuejs": "vue", "vue.js": "vue", "vue": "vue",
+    "nodejs": "node", "node.js": "node",
+    "golang": "go",
+    "mongo": "mongodb", "mongodb": "mongodb",
+    "py": "python", "python3": "python",
+    "csharp": "c#",
+    "ci/cd": "cicd", "ci-cd": "cicd",
+    "nextjs": "next.js",
+}
+
 _WORD_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9+.#/\-]{1,}")
+
+_REQUIRED_CUES = re.compile(
+    r"\b(required|require|requires|requirement|requirements|must[\s-]?have|"
+    r"minimum\s+qualifications?|essential|must\s+have|need\s+to\s+have)\b",
+    re.IGNORECASE,
+)
+_PREFERRED_CUES = re.compile(
+    r"\b(preferred|preference|nice[\s-]?to[\s-]?have|bonus|is\s+a\s+plus|"
+    r"a\s+plus|desirable|good\s+to\s+have|ideally)\b",
+    re.IGNORECASE,
+)
+
+
+def _split_sentences(text: str) -> List[str]:
+    return [s for s in re.split(r"(?<=[.!?;\n])\s+", text or "") if s.strip()]
+
+
+def _sentence_weight_multiplier(sentence: str) -> float:
+    """Required-language sentences count more; preferred/bonus ones count less."""
+    if _REQUIRED_CUES.search(sentence):
+        return 1.6
+    if _PREFERRED_CUES.search(sentence):
+        return 0.6
+    return 1.0
 
 
 def _tokenize(text: str) -> List[str]:
@@ -74,44 +134,66 @@ def _tokenize(text: str) -> List[str]:
 
 
 def _singularize(word: str) -> str:
-    """Cheap plural→singular normalization so 'skills'/'skill' match as one keyword."""
+    """
+    Cheap plural→singular normalization so 'skills'/'skill' match as one
+    keyword. Not real lemmatization — a hand-tuned set of suffix rules with
+    guards for the false-plural cases that actually show up in resumes/job
+    postings: words ending in 'us' or 'ss' ("plus", "bonus", "focus",
+    "status", "analysis") are never touched, since naively stripping their
+    trailing 's' produces garbage ("plus" -> "plu").
+    """
+    if word.endswith(("us", "ss")):
+        return word
     if word.endswith("ies") and len(word) > 4:
         return word[:-3] + "y"
-    if word.endswith("es") and len(word) > 4 and word[-3] in "sxzh":
-        return word[:-2]
-    if word.endswith("s") and not word.endswith("ss") and len(word) > 3:
+    if word.endswith("es") and len(word) > 4:
+        # "boxes"/"churches"/"dishes" genuinely drop the whole "es". Words
+        # like "databases"/"phrases"/"releases" only look similar because
+        # their singular already ends in 'e' — for those, drop just the 's'.
+        if word.endswith(("xes", "zes", "ches", "shes")):
+            return word[:-2]
+        return word[:-1]
+    if word.endswith("s") and len(word) > 3:
         return word[:-1]
     return word
 
 
-def _extract_weighted_keywords(text: str, top_n: int = 30) -> List[Tuple[str, int]]:
+def _normalize_token(word: str) -> str:
+    """Singularize, then fold through the common tech-alias table."""
+    singular = _singularize(word)
+    return _SYNONYMS.get(word, _SYNONYMS.get(singular, singular))
+
+
+def _extract_weighted_keywords(text: str, top_n: int = 30) -> List[Tuple[str, float]]:
     """
-    Extract the most frequent meaningful unigrams and bigrams from text.
+    Extract the most important unigrams and bigrams from text.
 
-    Frequency IS the weight — a keyword the job description repeats five
-    times matters more than one mentioned once, exactly like how ATS keyword
-    weighting works in practice.
+    Weight = frequency, adjusted per-occurrence by whether the sentence it
+    appeared in used required/must-have language (1.6x) or preferred/
+    nice-to-have language (0.6x) — see _sentence_weight_multiplier. A
+    keyword mentioned once as "required" can outweigh one mentioned twice
+    as "a nice-to-have", matching how real ATS keyword weighting behaves.
     """
-    tokens = _tokenize(text)
-    norm = [_singularize(t) for t in tokens]
+    counts: Counter = Counter()
 
-    unigrams = [t for t in norm if t not in _STOPWORDS and len(t) > 2 and not t.isdigit()]
+    for sentence in _split_sentences(text):
+        multiplier = _sentence_weight_multiplier(sentence)
+        norm = [_normalize_token(t) for t in _tokenize(sentence)]
 
-    bigrams = []
-    for i in range(len(norm) - 1):
-        a, b = norm[i], norm[i + 1]
-        if a not in _STOPWORDS and b not in _STOPWORDS and len(a) > 2 and len(b) > 2:
-            bigrams.append(f"{a} {b}")
+        unigrams = [t for t in norm if t not in _STOPWORDS and len(t) > 2 and not t.isdigit()]
+        for t in unigrams:
+            counts[t] += multiplier
 
-    counts = Counter(unigrams)
-    bigram_counts = Counter(bigrams)
-    # A matched bigram is a stronger, more specific signal ("machine learning"
-    # beats "machine" + "learning" separately) — weight it a bit higher.
-    for phrase, c in bigram_counts.items():
-        if c >= 2:
-            counts[phrase] = c + 1
+        for i in range(len(norm) - 1):
+            a, b = norm[i], norm[i + 1]
+            if a not in _STOPWORDS and b not in _STOPWORDS and len(a) > 2 and len(b) > 2:
+                phrase = f"{a} {b}"
+                # A matched bigram is a stronger, more specific signal
+                # ("machine learning" beats "machine" + "learning" separately).
+                counts[phrase] += multiplier * 1.3
 
-    return counts.most_common(top_n)
+    ranked = counts.most_common(top_n)
+    return [(kw, round(weight, 1)) for kw, weight in ranked]
 
 
 def _format_checks(resume_text: str, is_from_pdf: bool) -> List[Dict]:
@@ -187,9 +269,10 @@ def score_resume_against_job(
     Returns a fully explainable result — every number traces back to a
     concrete matched/missing keyword or a specific format check.
     """
-    resume_norm_tokens = set(_singularize(t) for t in _tokenize(resume_text))
-    # Also build the set of adjacent-pair phrases in the resume for bigram matching.
-    resume_tokens_list = [_singularize(t) for t in _tokenize(resume_text)]
+    # Same normalization (singularize + synonym folding) on both sides —
+    # otherwise a resume saying "JS" would never match a JD saying "JavaScript".
+    resume_tokens_list = [_normalize_token(t) for t in _tokenize(resume_text)]
+    resume_norm_tokens = set(resume_tokens_list)
     resume_bigrams = {
         f"{resume_tokens_list[i]} {resume_tokens_list[i+1]}"
         for i in range(len(resume_tokens_list) - 1)
@@ -242,8 +325,11 @@ def score_resume_against_job(
         "format_checks": checks,
         "methodology": (
             "Deterministic keyword-overlap scoring, not an LLM estimate: keywords are "
-            "extracted from the job description weighted by frequency, matched against "
-            "the resume's extracted text, and combined 70% keyword match / 30% format "
-            "checks. The same inputs always produce the same score."
+            "extracted from the job description weighted by frequency, boosted ~1.6x when "
+            "the posting says 'required'/'must-have' and reduced ~0.6x for "
+            "'preferred'/'nice-to-have', matched against the resume (with common synonyms "
+            "like JS/JavaScript and Postgres/PostgreSQL folded together), and combined "
+            "70% keyword match / 30% format checks. The same inputs always produce the "
+            "same score."
         ),
     }
