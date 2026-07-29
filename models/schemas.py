@@ -62,6 +62,35 @@ class ResumeParseResponse(BaseModel):
     cleaned: dict
 
 
+class ATSKeywordItem(BaseModel):
+    keyword: str
+    weight: int
+
+
+class ATSFormatCheck(BaseModel):
+    name: str
+    passed: bool
+    detail: str
+
+
+class ATSScoreResponse(BaseModel):
+    """
+    Output schema for /ats-score.
+
+    Every field traces back to something concrete — deterministic keyword
+    overlap and format checks, never an LLM-estimated number. See
+    services/ats_scorer.py for the scoring method.
+    """
+    overall_score: float
+    rating: str
+    keyword_match_score: float
+    format_score: float
+    matched_keywords: List[ATSKeywordItem]
+    missing_keywords: List[ATSKeywordItem]
+    format_checks: List[ATSFormatCheck]
+    methodology: str
+
+
 # ─── Week 2 Day 3+4 — Technical Agent ────────────────────────────────────────
 
 class TechnicalQuestionRequest(BaseModel):

@@ -20,6 +20,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from agents.stress_agent import generate_stress_question
 from agents.technical_agent import generate_technical_question
 from models.schemas import (
+    ATSScoreResponse,
     DecisionRequest,
     DecisionResponse,
     NextQuestionRequest,
@@ -31,9 +32,11 @@ from models.schemas import (
     TechnicalQuestionResponse,
 )
 from services import db, session_manager
+from services.ats_scorer import score_resume_against_job
 from services.data_cleaner import clean_resume_data
 from services.decision_engine import decide_next_step
 from services.interview_service import run_interview_step
+from services.pdf_parser import extract_text_from_pdf_bytes
 from services.resume_processor import process_resume
 
 logger = logging.getLogger(__name__)
@@ -45,6 +48,7 @@ router = APIRouter()
 MAX_UPLOAD_MB = float(os.getenv("MAX_UPLOAD_MB", "5"))
 MAX_UPLOAD_BYTES = int(MAX_UPLOAD_MB * 1024 * 1024)
 MAX_PASTE_CHARS = int(os.getenv("MAX_PASTE_CHARS", "20000"))
+MAX_JD_CHARS = int(os.getenv("MAX_JD_CHARS", "10000"))
 
 
 @router.post("/parse-resume", response_model=ResumeParseResponse)
@@ -222,3 +226,57 @@ def next_question_endpoint(request: NextQuestionRequest):
         cognitive_suggested_tone=result.get("cognitive_suggested_tone"),
         cognitive_stress_hint=result.get("cognitive_stress_hint"),
     )
+
+
+@router.post("/ats-score", response_model=ATSScoreResponse)
+async def ats_score_endpoint(
+    job_description: str = Form(...),
+    text: Optional[str] = Form(None),
+    file: Optional[UploadFile] = File(None),
+):
+    """
+    POST /ats-score
+
+    Scores a resume against a job description the way a real ATS keyword
+    filter would — deterministic keyword-overlap + format checks, no LLM
+    involved in computing the score (see services/ats_scorer.py). Accepts
+    the resume as either pasted text or a PDF upload, same as /parse-resume.
+    """
+    if not job_description or not job_description.strip():
+        raise HTTPException(status_code=400, detail="job_description is required.")
+    if len(job_description) > MAX_JD_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Job description too long. Max is {MAX_JD_CHARS} characters.",
+        )
+
+    resume_text = ""
+    is_from_pdf = False
+
+    if file is not None:
+        pdf_bytes = await file.read()
+        if len(pdf_bytes) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Max upload size is {MAX_UPLOAD_MB:.0f}MB.",
+            )
+        resume_text = extract_text_from_pdf_bytes(pdf_bytes)
+        is_from_pdf = True
+        logger.info("ats-score: PDF file received — name='%s', extracted %d chars", file.filename, len(resume_text))
+    elif text:
+        if len(text) > MAX_PASTE_CHARS:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Pasted text too long. Max is {MAX_PASTE_CHARS} characters.",
+            )
+        resume_text = text
+        logger.info("ats-score: Text input received — length=%d chars", len(text))
+    else:
+        raise HTTPException(status_code=400, detail="Provide either 'text' or 'file'.")
+
+    result = score_resume_against_job(
+        resume_text=resume_text,
+        job_description=job_description,
+        is_from_pdf=is_from_pdf,
+    )
+    return ATSScoreResponse(**result)
