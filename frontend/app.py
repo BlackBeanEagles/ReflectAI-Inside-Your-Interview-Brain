@@ -465,7 +465,9 @@ with st.sidebar:
         )
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
-tab_interview, tab_resume = st.tabs(["🎯 Interview Session", "📄 Resume Analysis"])
+tab_interview, tab_resume, tab_ats = st.tabs(
+    ["🎯 Interview Session", "📄 Resume Analysis", "✅ ATS Score"]
+)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -484,6 +486,19 @@ def _call_parse(text=None, file=None, session_id=None):
     r.raise_for_status()
     d = r.json()
     return d["raw"], d["cleaned"]
+
+
+def _call_ats_score(job_description, text=None, file=None):
+    data = {"job_description": job_description}
+    if file is not None:
+        r = _http().post(f"{BACKEND_BASE}/ats-score",
+                         files={"file": (file.name, file.getvalue(), "application/pdf")},
+                         data=data, timeout=30)
+    else:
+        r = _http().post(f"{BACKEND_BASE}/ats-score",
+                         data={**data, "text": text}, timeout=30)
+    r.raise_for_status()
+    return r.json()
 
 
 def _call_next_question(
@@ -1544,6 +1559,141 @@ with tab_resume:
             st.error(st.session_state["ra_tech_err"])
         if st.session_state.get("ra_eval_err"):
             st.error(st.session_state["ra_eval_err"])
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 3 — ATS SCORE
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab_ats:
+    st.markdown(
+        "Check how a resume scores against a specific job posting, the way an "
+        "**Applicant Tracking System** actually filters candidates — keyword "
+        "overlap plus resume format checks. This is **not** an AI-guessed number: "
+        "every point of the score traces back to a specific matched keyword or "
+        "check, and the same resume + job description always produce the same "
+        "score."
+    )
+    st.markdown("")
+
+    for k, v in {
+        "ats_result": None, "ats_error": None,
+    }.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+
+    ats_jd = st.text_area(
+        "Job description",
+        placeholder="Paste the full job posting here — the more complete it is, "
+                     "the more accurate the keyword match.",
+        height=160, key="ats_jd_input",
+    )
+
+    ats_input_method = st.radio("Resume input method", ["Paste text", "Upload PDF"],
+                                 horizontal=True, key="ats_input_method")
+    ats_text, ats_file = None, None
+    if ats_input_method == "Paste text":
+        ats_text = st.text_area(
+            "Paste resume", height=180,
+            placeholder="Skills:\nPython, Django\n\nExperience:\nBackend developer...",
+            key="ats_resume_text",
+        )
+    else:
+        ats_file = st.file_uploader("Upload resume PDF", type=["pdf"], key="ats_resume_pdf")
+
+    if st.button("✅  Check ATS Score", type="primary", use_container_width=True, key="ats_check_btn"):
+        st.session_state["ats_result"] = None
+        st.session_state["ats_error"] = None
+        has_resume = (ats_text and ats_text.strip()) or ats_file
+        if not ats_jd or not ats_jd.strip():
+            st.warning("Please paste a job description first.")
+        elif not has_resume:
+            st.warning("Please paste your resume or upload a PDF first.")
+        else:
+            with st.spinner("Scoring resume against job description..."):
+                try:
+                    st.session_state["ats_result"] = _call_ats_score(
+                        job_description=ats_jd.strip(),
+                        text=ats_text.strip() if ats_text else None,
+                        file=ats_file,
+                    )
+                except requests.exceptions.ConnectionError:
+                    st.session_state["ats_error"] = "Cannot connect to backend."
+                except Exception as e:
+                    st.session_state["ats_error"] = _friendly_http_error(e)
+
+    if st.session_state.get("ats_error"):
+        st.error(st.session_state["ats_error"])
+
+    if st.session_state.get("ats_result"):
+        res = st.session_state["ats_result"]
+        st.divider()
+
+        overall = res.get("overall_score", 0)
+        rating = res.get("rating", "")
+        color = _score_color(overall / 10)  # reuse the 0-10 color thresholds on a 0-100 scale
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown(
+                f'<div class="score-panel"><div class="big-num" style="color:{color};">'
+                f'{overall:.0f}</div><div class="panel-label">Overall — {rating}</div></div>',
+                unsafe_allow_html=True,
+            )
+        with c2:
+            st.markdown(
+                f'<div class="score-panel"><div class="big-num" style="color:{_score_color(res.get("keyword_match_score",0)/10)};">'
+                f'{res.get("keyword_match_score",0):.0f}</div><div class="panel-label">Keyword Match</div></div>',
+                unsafe_allow_html=True,
+            )
+        with c3:
+            st.markdown(
+                f'<div class="score-panel"><div class="big-num" style="color:{_score_color(res.get("format_score",0)/10)};">'
+                f'{res.get("format_score",0):.0f}</div><div class="panel-label">Format Score</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("")
+        st.caption(f"ℹ️ {res.get('methodology', '')}")
+
+        col_match, col_missing = st.columns(2)
+        with col_match:
+            st.markdown("**✅ Matched keywords**")
+            matched = res.get("matched_keywords", [])
+            if matched:
+                st.markdown(
+                    '<div class="chip-row">'
+                    + "".join(f'<span class="chip chip-proj">{m["keyword"]}</span>' for m in matched)
+                    + '</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.caption("No overlapping keywords found.")
+        with col_missing:
+            st.markdown("**⚠ Missing keywords**")
+            missing = res.get("missing_keywords", [])
+            if missing:
+                st.markdown(
+                    '<div class="chip-row">'
+                    + "".join(f'<span class="chip chip-exp">{m["keyword"]}</span>' for m in missing)
+                    + '</div>',
+                    unsafe_allow_html=True,
+                )
+                st.caption("Consider naturally working these into your resume if they genuinely apply to you.")
+            else:
+                st.caption("No significant gaps detected.")
+
+        st.markdown("")
+        st.markdown("**Format checks**")
+        for check in res.get("format_checks", []):
+            icon = "✅" if check.get("passed") else "⚠"
+            cls = "fb-strength" if check.get("passed") else "fb-weakness"
+            st.markdown(
+                f'<div class="fb-card {cls}">'
+                f'<div class="fb-label">{icon} {check.get("name","")}</div>{check.get("detail","")}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
 
 # ─── Footer ──────────────────────────────────────────────────────────────────
