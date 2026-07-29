@@ -488,15 +488,15 @@ def _call_parse(text=None, file=None, session_id=None):
     return d["raw"], d["cleaned"]
 
 
-def _call_ats_score(job_description, text=None, file=None):
-    data = {"job_description": job_description}
+def _call_ats_score(job_description, text=None, file=None, include_recruiter_take=False):
+    data = {"job_description": job_description, "include_recruiter_take": include_recruiter_take}
     if file is not None:
         r = _http().post(f"{BACKEND_BASE}/ats-score",
                          files={"file": (file.name, file.getvalue(), "application/pdf")},
-                         data=data, timeout=30)
+                         data=data, timeout=30 if not include_recruiter_take else 60)
     else:
         r = _http().post(f"{BACKEND_BASE}/ats-score",
-                         data={**data, "text": text}, timeout=30)
+                         data={**data, "text": text}, timeout=30 if not include_recruiter_take else 60)
     r.raise_for_status()
     return r.json()
 
@@ -1567,12 +1567,11 @@ with tab_resume:
 
 with tab_ats:
     st.markdown(
-        "Check how a resume scores against a specific job posting, the way an "
-        "**Applicant Tracking System** actually filters candidates — keyword "
-        "overlap plus resume format checks. This is **not** an AI-guessed number: "
-        "every point of the score traces back to a specific matched keyword or "
-        "check, and the same resume + job description always produce the same "
-        "score."
+        "Check how a resume scores against a specific job posting, the way a real "
+        "**ATS / resume screener** actually evaluates candidates — 7 weighted "
+        "categories (Keyword Match, Experience, Formatting, Skills, Education, "
+        "Contact Info, Grammar), each fully traceable. This is **not** an AI-guessed "
+        "number: the same resume + job description always produce the same score."
     )
     st.markdown("")
 
@@ -1601,6 +1600,12 @@ with tab_ats:
     else:
         ats_file = st.file_uploader("Upload resume PDF", type=["pdf"], key="ats_resume_pdf")
 
+    ats_want_recruiter_take = st.checkbox(
+        "Also get a recruiter's first impression (AI-generated, ~10-20s extra — "
+        "subjective, not part of the score above)",
+        value=False, key="ats_want_recruiter_take",
+    )
+
     if st.button("✅  Check ATS Score", type="primary", use_container_width=True, key="ats_check_btn"):
         st.session_state["ats_result"] = None
         st.session_state["ats_error"] = None
@@ -1610,12 +1615,17 @@ with tab_ats:
         elif not has_resume:
             st.warning("Please paste your resume or upload a PDF first.")
         else:
-            with st.spinner("Scoring resume against job description..."):
+            spinner_text = (
+                "Scoring resume + asking for a recruiter's first read..."
+                if ats_want_recruiter_take else "Scoring resume against job description..."
+            )
+            with st.spinner(spinner_text):
                 try:
                     st.session_state["ats_result"] = _call_ats_score(
                         job_description=ats_jd.strip(),
                         text=ats_text.strip() if ats_text else None,
                         file=ats_file,
+                        include_recruiter_take=ats_want_recruiter_take,
                     )
                 except requests.exceptions.ConnectionError:
                     st.session_state["ats_error"] = "Cannot connect to backend."
@@ -1631,30 +1641,69 @@ with tab_ats:
 
         overall = res.get("overall_score", 0)
         rating = res.get("rating", "")
-        color = _score_color(overall / 10)  # reuse the 0-10 color thresholds on a 0-100 scale
+        color = _score_color(overall / 10)
 
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.markdown(
-                f'<div class="score-panel"><div class="big-num" style="color:{color};">'
-                f'{overall:.0f}</div><div class="panel-label">Overall — {rating}</div></div>',
-                unsafe_allow_html=True,
-            )
-        with c2:
-            st.markdown(
-                f'<div class="score-panel"><div class="big-num" style="color:{_score_color(res.get("keyword_match_score",0)/10)};">'
-                f'{res.get("keyword_match_score",0):.0f}</div><div class="panel-label">Keyword Match</div></div>',
-                unsafe_allow_html=True,
-            )
-        with c3:
-            st.markdown(
-                f'<div class="score-panel"><div class="big-num" style="color:{_score_color(res.get("format_score",0)/10)};">'
-                f'{res.get("format_score",0):.0f}</div><div class="panel-label">Format Score</div></div>',
-                unsafe_allow_html=True,
-            )
+        st.markdown(
+            f'<div class="score-panel" style="margin-bottom:1rem;">'
+            f'<div class="big-num" style="color:{color};font-size:2.8rem;">{overall:.0f}</div>'
+            f'<div class="panel-label">Overall ATS Score — {rating}</div></div>',
+            unsafe_allow_html=True,
+        )
 
+        # ── Category breakdown ──────────────────────────────────────────
+        st.markdown("**Category breakdown**")
+        for cat in res.get("categories", []):
+            fill = int(cat.get("score", 0))
+            bar_color = _bar_color(cat.get("score", 0) / 10)
+            st.markdown(
+                f'<div class="dim-row">'
+                f'<span class="dim-name">{cat.get("label","")} ({cat.get("weight",0)}%)</span>'
+                f'<div class="dim-bar-bg"><div class="dim-bar-fill" style="width:{fill}%;background:{bar_color};"></div></div>'
+                f'<span class="dim-score">{cat.get("score",0):.0f}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
         st.markdown("")
         st.caption(f"ℹ️ {res.get('methodology', '')}")
+
+        # ── Recruiter's take (optional, LLM, clearly separated) ─────────
+        if res.get("recruiter_take"):
+            st.markdown("")
+            st.markdown(
+                f'<div class="transition-banner">'
+                f'<strong>🗣️ Recruiter\'s first read (AI-generated, subjective — not part of the score above)</strong><br>'
+                f'{res["recruiter_take"]}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+        # ── Section ranking ───────────────────────────────────────────────
+        st.markdown("")
+        st.markdown("**Section ranking** (0-10)")
+        sec_cols = st.columns(len(res.get("section_ranking", [])) or 1)
+        for col, sec in zip(sec_cols, res.get("section_ranking", [])):
+            with col:
+                sec_color = _score_color(sec.get("score", 0))
+                st.markdown(
+                    f'<div class="score-panel">'
+                    f'<div class="big-num" style="font-size:1.5rem;color:{sec_color};">{sec.get("score",0):.1f}</div>'
+                    f'<div class="panel-label">{sec.get("section","")}</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+        # ── Keyword importance graph ──────────────────────────────────────
+        st.markdown("")
+        st.markdown("**Keyword importance** (from the job description, ranked by weight)")
+        for kw in res.get("keyword_importance", []):
+            bar_color = "#1a7a44" if kw.get("matched") else "#c0470a"
+            icon = "✅" if kw.get("matched") else "⚠"
+            st.markdown(
+                f'<div class="dim-row">'
+                f'<span class="dim-name">{icon} {kw.get("keyword","")}</span>'
+                f'<div class="dim-bar-bg"><div class="dim-bar-fill" style="width:{kw.get("importance_pct",0)}%;background:{bar_color};"></div></div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
         col_match, col_missing = st.columns(2)
         with col_match:
@@ -1683,25 +1732,29 @@ with tab_ats:
             else:
                 st.caption("No significant gaps detected.")
 
+        # ── All checks, grouped by category ───────────────────────────────
         st.markdown("")
-        st.markdown("**Format checks**")
-        for check in res.get("format_checks", []):
-            icon = "✅" if check.get("passed") else "⚠"
-            cls = "fb-strength" if check.get("passed") else "fb-weakness"
-            st.markdown(
-                f'<div class="fb-card {cls}">'
-                f'<div class="fb-label">{icon} {check.get("name","")}</div>{check.get("detail","")}'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
+        with st.expander("All category checks"):
+            for cat in res.get("categories", []):
+                st.markdown(f"**{cat.get('label','')}**")
+                for check in cat.get("checks", []):
+                    icon = "✅" if check.get("passed") else "⚠"
+                    cls = "fb-strength" if check.get("passed") else "fb-weakness"
+                    st.markdown(
+                        f'<div class="fb-card {cls}">'
+                        f'<div class="fb-label">{icon} {check.get("name","")}</div>{check.get("detail","")}'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
 
+        # ── Resume ROI: improvement plan ranked by estimated score gain ───
         plan = res.get("improvement_plan", [])
         if plan:
             st.markdown("")
-            st.markdown("**📈 How to improve this score**")
+            st.markdown("**📈 Resume ROI — ranked by expected score gain**")
             st.caption(
-                "Ranked by impact — each item comes directly from the matched/missing "
-                "keywords and format checks above, not a separate guess."
+                "Each estimated gain is computed exactly from that keyword's or check's share "
+                "of its category's weight — not a separate guess. Fix the top of this list first."
             )
             _prio_cls = {"high": "report-weakness", "medium": "report-pattern", "low": "report-rec"}
             _prio_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}
@@ -1709,9 +1762,10 @@ with tab_ats:
                 p = item.get("priority", "medium")
                 st.markdown(
                     f'<div class="report-item {_prio_cls.get(p, "report-rec")}">'
-                    f'<strong>{_prio_icon.get(p, "🟡")} [{item.get("category","")}] '
-                    f'{item.get("priority","").upper()}</strong> — {item.get("action","")}'
-                    f'<br><span style="opacity:0.8;font-size:0.85em;">{item.get("reason","")}</span>'
+                    f'<strong>{_prio_icon.get(p, "🟡")} +{item.get("estimated_gain",0):.1f} pts '
+                    f'[{item.get("category","")}]</strong> — {item.get("action","")}'
+                    f'<br><span style="opacity:0.8;font-size:0.85em;">'
+                    f'{item.get("reason","")} · Effort: {item.get("effort","")}</span>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )

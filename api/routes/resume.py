@@ -233,14 +233,19 @@ async def ats_score_endpoint(
     job_description: str = Form(...),
     text: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
+    include_recruiter_take: bool = Form(False),
 ):
     """
     POST /ats-score
 
-    Scores a resume against a job description the way a real ATS keyword
-    filter would — deterministic keyword-overlap + format checks, no LLM
-    involved in computing the score (see services/ats_scorer.py). Accepts
+    Scores a resume against a job description using 7 weighted categories
+    the way a real ATS/resume screener would — deterministic, no LLM
+    involved in computing any score (see services/ats_scorer.py). Accepts
     the resume as either pasted text or a PDF upload, same as /parse-resume.
+
+    include_recruiter_take=true additionally asks the LLM for a short,
+    non-deterministic "recruiter's first read" — opt-in and off by default
+    so the (free, instant) deterministic score never waits on an LLM call.
     """
     if not job_description or not job_description.strip():
         raise HTTPException(status_code=400, detail="job_description is required.")
@@ -278,5 +283,6 @@ async def ats_score_endpoint(
         resume_text=resume_text,
         job_description=job_description,
         is_from_pdf=is_from_pdf,
+        include_recruiter_take=include_recruiter_take,
     )
     return ATSScoreResponse(**result)

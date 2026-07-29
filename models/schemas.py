@@ -73,11 +73,34 @@ class ATSFormatCheck(BaseModel):
     detail: str
 
 
+class ATSCategory(BaseModel):
+    """One of the 7 weighted scoring categories — see services/ats_scorer.py."""
+    key: str
+    label: str
+    weight: int
+    score: float
+    checks: List[ATSFormatCheck]
+
+
 class ATSImprovementItem(BaseModel):
-    priority: str   # "high" / "medium" / "low"
-    category: str   # "Format" / "Keywords" / "Strategy"
+    priority: str          # "high" / "medium" / "low"
+    category: str
     action: str
     reason: str
+    estimated_gain: float  # overall score points this fix would recover, derived exactly (see ats_scorer.py)
+    effort: str
+
+
+class ATSKeywordImportance(BaseModel):
+    keyword: str
+    weight: float
+    importance_pct: float
+    matched: bool
+
+
+class ATSSectionScore(BaseModel):
+    section: str
+    score: float  # 0-10
 
 
 class ATSScoreResponse(BaseModel):
@@ -85,17 +108,20 @@ class ATSScoreResponse(BaseModel):
     Output schema for /ats-score.
 
     Every field traces back to something concrete — deterministic keyword
-    overlap and format checks, never an LLM-estimated number. See
-    services/ats_scorer.py for the scoring method.
+    overlap, weighted category scoring, and format checks, never an
+    LLM-estimated number. The single exception is recruiter_take, which is
+    explicitly optional, non-deterministic LLM output and is never part of
+    the numeric score. See services/ats_scorer.py for the scoring method.
     """
     overall_score: float
     rating: str
-    keyword_match_score: float
-    format_score: float
+    categories: List[ATSCategory]
     matched_keywords: List[ATSKeywordItem]
     missing_keywords: List[ATSKeywordItem]
-    format_checks: List[ATSFormatCheck]
+    keyword_importance: List[ATSKeywordImportance]
+    section_ranking: List[ATSSectionScore]
     improvement_plan: List[ATSImprovementItem]
+    recruiter_take: Optional[str] = None
     methodology: str
 
 
