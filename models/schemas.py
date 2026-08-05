@@ -313,6 +313,12 @@ class EvaluateResponse(BaseModel):
     error:       bool = False
 
 
+class TranscribeResponse(BaseModel):
+    """Output schema for /transcribe-audio — voice input for interview answers."""
+    text: str
+    is_error: bool = False
+
+
 # ─── Week 3 Day 5 — Session Management ───────────────────────────────────────
 
 class SessionStartRequest(BaseModel):

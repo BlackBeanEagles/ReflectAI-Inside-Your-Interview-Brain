@@ -636,6 +636,51 @@ def _call_evaluate(question, answer, answer_type, coaching_hint=None):
     return r.json()
 
 
+def _call_transcribe(audio_bytes, filename="answer.wav"):
+    r = _http().post(
+        f"{BACKEND_BASE}/transcribe-audio",
+        files={"file": (filename, audio_bytes, "audio/wav")},
+        timeout=45,
+    )
+    r.raise_for_status()
+    return r.json()  # {"text": ..., "is_error": bool}
+
+
+def _speak_text_button(text: str, key: str, label: str = "🔊 Listen to the question"):
+    """
+    Browser-native text-to-speech via the Web Speech API. No backend round
+    trip — the question text is already on the page, so this just asks the
+    browser to read it aloud. st.components.v1.html is required (not
+    st.markdown) because Streamlit strips <script> tags from markdown.
+    """
+    import json as _json
+    import streamlit.components.v1 as components
+
+    safe_text = _json.dumps(text or "")
+    components.html(
+        f"""
+        <button id="{key}" style="
+            background:var(--ri-accent, #4f6ef7); color:#fff; border:none;
+            border-radius:6px; padding:0.5rem 1rem; font-size:0.85rem;
+            font-weight:600; cursor:pointer; width:100%;
+        ">{label}</button>
+        <script>
+            document.getElementById("{key}").addEventListener("click", function() {{
+                if (!window.speechSynthesis) {{
+                    alert("Speech synthesis isn't supported in this browser.");
+                    return;
+                }}
+                window.speechSynthesis.cancel();
+                const utter = new SpeechSynthesisUtterance({safe_text});
+                utter.rate = 1.0;
+                window.speechSynthesis.speak(utter);
+            }});
+        </script>
+        """,
+        height=48,
+    )
+
+
 def _call_session_start(store_consent=False):
     r = _http().post(
         f"{BACKEND_BASE}/session/start",
@@ -1100,12 +1145,35 @@ with tab_interview:
                 f'<div class="q-box {box_cls} ri-fade-in">{st.session_state["iv_current_q"]}</div>',
                 unsafe_allow_html=True,
             )
+            _speak_text_button(
+                st.session_state["iv_current_q"], key=f"iv_speak_{count}",
+                label="🔊 Listen to the question",
+            )
+
+            # ── Voice answer (optional) ─────────────────────────────────────
+            with st.expander("🎙️ Record your answer instead of typing"):
+                iv_audio = st.audio_input("Record your answer", key=f"iv_audio_{count}")
+                if iv_audio is not None:
+                    if st.button("📝 Transcribe recording into the answer box",
+                                  key=f"iv_transcribe_btn_{count}", use_container_width=True):
+                        with st.spinner("Transcribing..."):
+                            try:
+                                result = _call_transcribe(iv_audio.getvalue())
+                                if result.get("is_error"):
+                                    st.error(result["text"])
+                                else:
+                                    st.session_state[f"iv_answer_{count}"] = result["text"]
+                                    st.rerun()
+                            except requests.exceptions.ConnectionError:
+                                st.error("Cannot connect to backend.")
+                            except Exception as e:
+                                st.error(_friendly_http_error(e))
 
             # ── Answer input ──────────────────────────────────────────────
             st.markdown("")
             user_answer = st.text_area(
                 "Your Answer",
-                placeholder="Type your answer here...",
+                placeholder="Type your answer here, or record it above...",
                 height=140,
                 key=f"iv_answer_{count}",
                 help="Type your answer and click Evaluate to get AI feedback.",

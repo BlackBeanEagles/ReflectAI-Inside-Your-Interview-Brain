@@ -25,7 +25,8 @@ web host gives you the RAM/GPU an 8B Ollama model needs.
 3. Render will detect the `Dockerfile` automatically. Leave build/start commands blank.
 4. Under **Environment**, add:
    - `LLM_PROVIDER` = `groq`
-   - `GROQ_API_KEY` = *(your key from step 1)*
+   - `GROQ_API_KEY` = *(your key from step 1 — this also powers voice input's
+     speech-to-text, independent of which LLM_PROVIDER you pick)*
    - `ALLOWED_ORIGINS` = `http://localhost:8501` *(update after step 3 below)*
 5. Deploy. Render gives you a URL like `https://reflectinterview-api.onrender.com`.
 6. Confirm it's alive: open `https://<your-render-url>/health` — you should see
