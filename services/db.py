@@ -75,9 +75,19 @@ def init_db() -> None:
     try:
         with pool.connection() as conn:
             conn.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    name TEXT,
+                    created_at TIMESTAMPTZ DEFAULT now()
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS resumes (
                     id SERIAL PRIMARY KEY,
                     session_id TEXT NOT NULL,
+                    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
                     raw_text TEXT,
                     skills JSONB,
                     projects JSONB,
@@ -89,6 +99,7 @@ def init_db() -> None:
                 CREATE TABLE IF NOT EXISTS interactions (
                     id SERIAL PRIMARY KEY,
                     session_id TEXT NOT NULL,
+                    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
                     question TEXT,
                     answer TEXT,
                     round_type TEXT,
@@ -103,20 +114,31 @@ def init_db() -> None:
                 CREATE TABLE IF NOT EXISTS reports (
                     id SERIAL PRIMARY KEY,
                     session_id TEXT NOT NULL,
+                    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
                     report JSONB,
                     created_at TIMESTAMPTZ DEFAULT now()
                 )
             """)
+            # Existing databases created before user_id existed won't have the
+            # column — add it defensively so upgrading doesn't require a
+            # manual migration step.
+            for table in ("resumes", "interactions", "reports"):
+                conn.execute(
+                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS user_id "
+                    f"INTEGER REFERENCES users(id) ON DELETE SET NULL"
+                )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_resumes_session ON resumes(session_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_interactions_session ON interactions(session_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_session ON reports(session_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id)")
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)")
         logger.info("db: tables ready.")
     except Exception:
         logger.exception("db: init_db failed — persistence disabled for this process.")
 
 
-def save_resume(session_id: str, raw_text: Optional[str], cleaned: Dict) -> None:
-    """Persist a parsed resume tied to a session_id. Best-effort."""
+def save_resume(session_id: str, raw_text: Optional[str], cleaned: Dict, user_id: Optional[int] = None) -> None:
+    """Persist a parsed resume tied to a session_id (and a user, if logged in). Best-effort."""
     pool = _get_pool()
     if pool is None:
         return
@@ -124,11 +146,12 @@ def save_resume(session_id: str, raw_text: Optional[str], cleaned: Dict) -> None
         with pool.connection() as conn:
             conn.execute(
                 """
-                INSERT INTO resumes (session_id, raw_text, skills, projects, experience)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO resumes (session_id, user_id, raw_text, skills, projects, experience)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
                     session_id,
+                    user_id,
                     raw_text,
                     json.dumps(cleaned.get("skills", [])),
                     json.dumps(cleaned.get("projects", [])),
@@ -139,8 +162,8 @@ def save_resume(session_id: str, raw_text: Optional[str], cleaned: Dict) -> None
         logger.exception("db: save_resume failed for session %s", session_id)
 
 
-def save_interaction(session_id: str, interaction: Dict) -> None:
-    """Persist one evaluated Q&A interaction. Best-effort."""
+def save_interaction(session_id: str, interaction: Dict, user_id: Optional[int] = None) -> None:
+    """Persist one evaluated Q&A interaction (and a user, if logged in). Best-effort."""
     pool = _get_pool()
     if pool is None:
         return
@@ -149,12 +172,13 @@ def save_interaction(session_id: str, interaction: Dict) -> None:
             conn.execute(
                 """
                 INSERT INTO interactions
-                    (session_id, question, answer, round_type, scores, final_score,
+                    (session_id, user_id, question, answer, round_type, scores, final_score,
                      feedback, response_time_seconds)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     session_id,
+                    user_id,
                     interaction.get("question"),
                     interaction.get("answer"),
                     interaction.get("round"),
@@ -168,16 +192,96 @@ def save_interaction(session_id: str, interaction: Dict) -> None:
         logger.exception("db: save_interaction failed for session %s", session_id)
 
 
-def save_report(session_id: str, report: Dict) -> None:
-    """Persist a generated final report. Best-effort."""
+def save_report(session_id: str, report: Dict, user_id: Optional[int] = None) -> None:
+    """Persist a generated final report (and a user, if logged in). Best-effort."""
     pool = _get_pool()
     if pool is None:
         return
     try:
         with pool.connection() as conn:
             conn.execute(
-                "INSERT INTO reports (session_id, report) VALUES (%s, %s)",
-                (session_id, json.dumps(report)),
+                "INSERT INTO reports (session_id, user_id, report) VALUES (%s, %s, %s)",
+                (session_id, user_id, json.dumps(report)),
             )
     except Exception:
         logger.exception("db: save_report failed for session %s", session_id)
+
+
+# ── Users ────────────────────────────────────────────────────────────────────
+# Unlike everything else in this module, user accounts are NOT best-effort —
+# signup/login must fail loudly if the database is unavailable, since a
+# silently-lost account creation would be far worse than a clear error. These
+# raise on failure; callers (api/routes/auth.py) turn that into an HTTP error.
+
+def create_user(email: str, password_hash: str, name: Optional[str] = None) -> Optional[Dict]:
+    """
+    Insert a new user. Returns the created user's {id, email, name} dict, or
+    None if a user with this email already exists. Raises if the DB is
+    unavailable — the caller must not report success it can't back up.
+    """
+    pool = _get_pool()
+    if pool is None:
+        raise RuntimeError("Persistent storage is not configured on this server.")
+    with pool.connection() as conn:
+        existing = conn.execute("SELECT id FROM users WHERE email = %s", (email,)).fetchone()
+        if existing:
+            return None
+        row = conn.execute(
+            "INSERT INTO users (email, password_hash, name) VALUES (%s, %s, %s) "
+            "RETURNING id, email, name",
+            (email, password_hash, name),
+        ).fetchone()
+        return {"id": row[0], "email": row[1], "name": row[2]}
+
+
+def get_user_by_email(email: str) -> Optional[Dict]:
+    """Returns {id, email, password_hash, name} or None. Raises if DB unavailable."""
+    pool = _get_pool()
+    if pool is None:
+        raise RuntimeError("Persistent storage is not configured on this server.")
+    with pool.connection() as conn:
+        row = conn.execute(
+            "SELECT id, email, password_hash, name FROM users WHERE email = %s", (email,)
+        ).fetchone()
+        if not row:
+            return None
+        return {"id": row[0], "email": row[1], "password_hash": row[2], "name": row[3]}
+
+
+def get_user_by_id(user_id: int) -> Optional[Dict]:
+    """Returns {id, email, name} or None. Best-effort (returns None on any failure)."""
+    pool = _get_pool()
+    if pool is None:
+        return None
+    try:
+        with pool.connection() as conn:
+            row = conn.execute(
+                "SELECT id, email, name FROM users WHERE id = %s", (user_id,)
+            ).fetchone()
+            if not row:
+                return None
+            return {"id": row[0], "email": row[1], "name": row[2]}
+    except Exception:
+        logger.exception("db: get_user_by_id failed for user %s", user_id)
+        return None
+
+
+def get_user_reports(user_id: int, limit: int = 20) -> List[Dict]:
+    """Most recent final reports for a logged-in user. Best-effort — returns [] on failure."""
+    pool = _get_pool()
+    if pool is None:
+        return []
+    try:
+        with pool.connection() as conn:
+            rows = conn.execute(
+                "SELECT session_id, report, created_at FROM reports "
+                "WHERE user_id = %s ORDER BY created_at DESC LIMIT %s",
+                (user_id, limit),
+            ).fetchall()
+            return [
+                {"session_id": r[0], "report": r[1], "created_at": r[2].isoformat()}
+                for r in rows
+            ]
+    except Exception:
+        logger.exception("db: get_user_reports failed for user %s", user_id)
+        return []

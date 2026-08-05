@@ -18,8 +18,9 @@ Delegates to:
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from api.routes.auth import get_optional_user
 from models.schemas import (
     SessionStartRequest,
     SessionStartResponse,
@@ -42,17 +43,25 @@ router = APIRouter(prefix="/session", tags=["Session"])
 # ─── POST /session/start ──────────────────────────────────────────────────────
 
 @router.post("/start", response_model=SessionStartResponse)
-def start_session(request: SessionStartRequest = SessionStartRequest()):
+def start_session(
+    request: SessionStartRequest = SessionStartRequest(),
+    current=Depends(get_optional_user),
+):
     """
     Create a new empty interview session.
 
     request.store_consent must be True for anything in this session to be
     persisted to the database — see SessionStartRequest and PRIVACY.md.
 
+    An optional Bearer token (logged-in user) tags the session with a
+    user_id purely so persisted records can later be retrieved via
+    /auth/history — anonymous use (no token) works exactly as before.
+
     Returns a session_id that the frontend must store and include in all
     subsequent session calls.
     """
-    session_id = session_manager.create_session(store_consent=request.store_consent)
+    user_id = current["user_id"] if current else None
+    session_id = session_manager.create_session(store_consent=request.store_consent, user_id=user_id)
     logger.info("session: Created session %s", session_id)
     return SessionStartResponse(session_id=session_id)
 
@@ -82,7 +91,8 @@ def add_interaction(request: AddInteractionRequest):
         response_time_seconds=request.response_time_seconds,
     )
     if session_manager.has_store_consent(request.session_id):
-        db.save_interaction(request.session_id, interaction)
+        db.save_interaction(request.session_id, interaction,
+                             user_id=session_manager.get_session_user_id(request.session_id))
 
     count = session_manager.get_session_count(request.session_id)
     logger.info(
@@ -164,7 +174,7 @@ def generate_final_report(session_id: str):
 
     report = generate_report(history)
     if session_manager.has_store_consent(session_id):
-        db.save_report(session_id, report)
+        db.save_report(session_id, report, user_id=session_manager.get_session_user_id(session_id))
 
     return ReportResponse(
         overall_score   = report.get("overall_score")   or 0.0,

@@ -101,7 +101,7 @@ async def parse_resume_endpoint(
 
     sid = (session_id or "").strip()
     if sid and session_manager.has_store_consent(sid):
-        db.save_resume(sid, text, cleaned)
+        db.save_resume(sid, text, cleaned, user_id=session_manager.get_session_user_id(sid))
 
     return ResumeParseResponse(raw=raw, cleaned=cleaned)
 

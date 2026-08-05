@@ -319,6 +319,56 @@ class TranscribeResponse(BaseModel):
     is_error: bool = False
 
 
+# ─── User Authentication ──────────────────────────────────────────────────────
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+    name: Optional[str] = None
+
+    @field_validator("email")
+    @classmethod
+    def _email_looks_valid(cls, v: str) -> str:
+        v = v.strip().lower()
+        if "@" not in v or "." not in v.split("@")[-1] or len(v) < 5:
+            raise ValueError("Enter a valid email address.")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def _password_min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters.")
+        return v
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    name: Optional[str] = None
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+class UserReportItem(BaseModel):
+    session_id: str
+    report: dict
+    created_at: str
+
+
+class UserHistoryResponse(BaseModel):
+    reports: List[UserReportItem]
+
+
 # ─── Week 3 Day 5 — Session Management ───────────────────────────────────────
 
 class SessionStartRequest(BaseModel):

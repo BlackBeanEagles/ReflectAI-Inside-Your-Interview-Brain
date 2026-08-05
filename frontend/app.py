@@ -431,6 +431,70 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
+    # ── Account (optional — anonymous use works exactly the same without it) ──
+    for _k, _v in {"auth_token": None, "auth_user": None}.items():
+        if _k not in st.session_state:
+            st.session_state[_k] = _v
+
+    if st.session_state.get("auth_user"):
+        st.divider()
+        st.markdown(f"👤 **{st.session_state['auth_user'].get('name') or st.session_state['auth_user']['email']}**")
+        st.caption(st.session_state["auth_user"]["email"])
+        if st.button("Log out", use_container_width=True, key="sidebar_logout"):
+            st.session_state["auth_token"] = None
+            st.session_state["auth_user"] = None
+            st.session_state["auth_history"] = None
+            st.rerun()
+
+        with st.expander("📜 My past interviews"):
+            if st.button("Refresh", key="history_refresh", use_container_width=True):
+                try:
+                    st.session_state["auth_history"] = _call_history()
+                except Exception as e:
+                    st.error(_friendly_http_error(e))
+            history = st.session_state.get("auth_history")
+            if history:
+                for item in history:
+                    rpt = item.get("report", {})
+                    st.markdown(
+                        f"**{rpt.get('overall_score', '—')}/10** · "
+                        f"{item.get('created_at', '')[:10]} · "
+                        f"{rpt.get('total_questions', 0)} questions"
+                    )
+            elif history == []:
+                st.caption("No saved interviews yet — opt in to saving during setup to build history here.")
+            else:
+                st.caption("Click Refresh to load.")
+    else:
+        st.divider()
+        with st.expander("🔐 Log in / Sign up"):
+            _auth_mode = st.radio("", ["Log in", "Sign up"], horizontal=True,
+                                   key="auth_mode", label_visibility="collapsed")
+            _auth_email = st.text_input("Email", key="auth_email_input")
+            _auth_password = st.text_input("Password", type="password", key="auth_password_input")
+            _auth_name = None
+            if _auth_mode == "Sign up":
+                _auth_name = st.text_input("Name (optional)", key="auth_name_input")
+
+            if st.button(_auth_mode, type="primary", use_container_width=True, key="auth_submit"):
+                if not _auth_email or not _auth_password:
+                    st.warning("Enter an email and password.")
+                else:
+                    try:
+                        if _auth_mode == "Sign up":
+                            result = _call_signup(_auth_email.strip(), _auth_password, _auth_name or None)
+                        else:
+                            result = _call_login(_auth_email.strip(), _auth_password)
+                        st.session_state["auth_token"] = result["access_token"]
+                        st.session_state["auth_user"] = result["user"]
+                        st.rerun()
+                    except Exception as e:
+                        st.error(_friendly_http_error(e))
+            st.caption(
+                "Optional — accounts let your interview history follow you across visits. "
+                "Everything works fine without one too."
+            )
+
     if st.session_state.get("iv_setup_done"):
         st.divider()
         cleaned = st.session_state.get("iv_cleaned") or {}
@@ -681,14 +745,41 @@ def _speak_text_button(text: str, key: str, label: str = "🔊 Listen to the que
     )
 
 
+def _auth_headers():
+    """Authorization header for the logged-in user, or {} if not logged in."""
+    token = st.session_state.get("auth_token")
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
 def _call_session_start(store_consent=False):
     r = _http().post(
         f"{BACKEND_BASE}/session/start",
         json={"store_consent": bool(store_consent)},
+        headers=_auth_headers(),
         timeout=10,
     )
     r.raise_for_status()
     return r.json()["session_id"]
+
+
+def _call_signup(email, password, name=None):
+    r = _http().post(f"{BACKEND_BASE}/auth/signup",
+                     json={"email": email, "password": password, "name": name}, timeout=15)
+    r.raise_for_status()
+    return r.json()
+
+
+def _call_login(email, password):
+    r = _http().post(f"{BACKEND_BASE}/auth/login",
+                     json={"email": email, "password": password}, timeout=15)
+    r.raise_for_status()
+    return r.json()
+
+
+def _call_history():
+    r = _http().get(f"{BACKEND_BASE}/auth/history", headers=_auth_headers(), timeout=15)
+    r.raise_for_status()
+    return r.json()["reports"]
 
 
 def _call_add_interaction(

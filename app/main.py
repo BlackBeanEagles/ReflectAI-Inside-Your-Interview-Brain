@@ -19,7 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api.routes import interview, resume, evaluation, session
+from api.routes import auth, interview, resume, evaluation, session
 from services import db
 from utils import llm
 
@@ -119,6 +119,7 @@ app.include_router(interview.router,  tags=["Interview"])
 app.include_router(resume.router,     tags=["Resume"])
 app.include_router(evaluation.router, tags=["Evaluation"])
 app.include_router(session.router)   # prefix="/session", tags=["Session"] set in router
+app.include_router(auth.router)      # prefix="/auth", tags=["Auth"] set in router
 
 
 @app.get("/")
