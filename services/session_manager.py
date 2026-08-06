@@ -55,6 +55,10 @@ _sessions: Dict[str, List[Dict]] = {}
 _last_touched: Dict[str, float] = {}
 _store_consent: Dict[str, bool] = {}
 _session_user: Dict[str, Optional[int]] = {}
+# Optional interview-content language (e.g. "Spanish"), picked once at setup
+# and applied to every question, evaluation, and the final report for this
+# session -- see agents/*.py, services/evaluator.py, services/report_generator.py.
+_session_language: Dict[str, Optional[str]] = {}
 _lock = threading.Lock()
 
 
@@ -71,6 +75,7 @@ def _evict_expired_locked() -> None:
         _last_touched.pop(sid, None)
         _store_consent.pop(sid, None)
         _session_user.pop(sid, None)
+        _session_language.pop(sid, None)
     if expired:
         logger.info("session_manager: Evicted %d expired session(s).", len(expired))
 
@@ -85,6 +90,7 @@ def _evict_oldest_if_over_capacity_locked() -> None:
         _last_touched.pop(oldest_sid, None)
         _store_consent.pop(oldest_sid, None)
         _session_user.pop(oldest_sid, None)
+        _session_language.pop(oldest_sid, None)
         logger.warning(
             "session_manager: MAX_SESSIONS (%d) exceeded — evicted oldest session %s.",
             MAX_SESSIONS, oldest_sid,
@@ -97,7 +103,11 @@ def _touch_locked(session_id: str) -> None:
 
 # ── Session lifecycle ──────────────────────────────────────────────────────────
 
-def create_session(store_consent: bool = False, user_id: Optional[int] = None) -> str:
+def create_session(
+    store_consent: bool = False,
+    user_id: Optional[int] = None,
+    language: Optional[str] = None,
+) -> str:
     """
     Create a new empty session.
 
@@ -111,6 +121,9 @@ def create_session(store_consent: bool = False, user_id: Optional[int] = None) -
             for tagging persisted records (resumes/interactions/reports) so
             a logged-in user can retrieve their history later — anonymous
             use (user_id=None) works exactly as before.
+        language: Optional interview-content language (e.g. "Spanish"),
+            picked once at setup and applied for the life of the session —
+            see get_session_language().
 
     Returns:
         session_id (UUID string) — store this on the client side.
@@ -121,11 +134,12 @@ def create_session(store_consent: bool = False, user_id: Optional[int] = None) -
         _sessions[session_id] = []
         _store_consent[session_id] = bool(store_consent)
         _session_user[session_id] = user_id
+        _session_language[session_id] = language
         _touch_locked(session_id)
         _evict_oldest_if_over_capacity_locked()
     logger.info(
-        "session_manager: Created session %s (store_consent=%s, user_id=%s)",
-        session_id, store_consent, user_id,
+        "session_manager: Created session %s (store_consent=%s, user_id=%s, language=%s)",
+        session_id, store_consent, user_id, language,
     )
     return session_id
 
@@ -134,6 +148,13 @@ def has_store_consent(session_id: str) -> bool:
     """Whether this session opted in to persistent storage."""
     with _lock:
         return _store_consent.get(session_id, False)
+
+
+def get_session_language(session_id: str) -> Optional[str]:
+    """The interview-content language chosen for this session, or None
+    (English/default) if no language was set at session start."""
+    with _lock:
+        return _session_language.get(session_id)
 
 
 def get_session_user_id(session_id: str) -> Optional[int]:

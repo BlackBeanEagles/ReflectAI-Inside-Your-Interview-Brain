@@ -282,6 +282,7 @@ def classify_thinking_style(
 def build_week5_cognitive_block(
     history: List[Dict],
     behavioral_summary: str = "",
+    language: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Build the full Week 5 cognitive object for API / report JSON.
@@ -289,6 +290,8 @@ def build_week5_cognitive_block(
     Args:
         history: Session interactions (may include response_time_seconds).
         behavioral_summary: Optional Week 4 behaviour summary for LLM coach text.
+        language: Optional interview-content language (e.g. "Spanish") for the
+            LLM-generated cognitive_coach_summary narrative. None means English.
     """
     fingerprint = build_thinking_fingerprint(history)
     imp_rows = [
@@ -339,7 +342,7 @@ def build_week5_cognitive_block(
     )
 
     coach = _cognitive_coach_llm(
-        fingerprint, style, mean_imp, detected_biases[:6], behavioral_summary
+        fingerprint, style, mean_imp, detected_biases[:6], behavioral_summary, language,
     )
 
     return {
@@ -365,6 +368,7 @@ def _cognitive_coach_llm(
     mean_imp: float,
     biases: List[str],
     behavioral_summary: str,
+    language: Optional[str] = None,
 ) -> str:
     """Week 5 Day 6 — short narrative; template fallback if LLM unavailable."""
     payload = {
@@ -374,10 +378,11 @@ def _cognitive_coach_llm(
         "biases": biases,
         "behavioral_context": (behavioral_summary or "")[:400],
     }
+    language_line = f"\nWrite your response in {language}." if language else ""
     prompt = f"""You are an AI cognitive coach (Week 5).
 Given structured session signals (JSON), write 2-4 sentences: how this candidate thinks,
 how they decide under pressure, and one concrete improvement habit.
-Avoid repeating JSON keys verbatim; write flowing prose. Under 120 words.
+Avoid repeating JSON keys verbatim; write flowing prose. Under 120 words.{language_line}
 
 DATA JSON:
 {json.dumps(payload, indent=2)}

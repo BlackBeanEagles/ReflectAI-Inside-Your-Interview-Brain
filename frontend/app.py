@@ -97,6 +97,24 @@ ROLE_PRESETS = [
     "Custom...",
 ]
 
+# Interview-content language — questions, evaluation feedback, and the final
+# report's LLM-written summary/coaching text are generated in this language
+# (see agents/*.py, services/evaluator.py, services/report_generator.py).
+# The app's own UI (buttons, labels, captions) stays English regardless —
+# translating the whole Streamlit UI is a much larger, separate effort.
+LANGUAGE_PRESETS = [
+    "English",
+    "Spanish",
+    "French",
+    "German",
+    "Portuguese",
+    "Hindi",
+    "Mandarin Chinese",
+    "Japanese",
+    "Arabic",
+    "Custom...",
+]
+
 @st.cache_resource
 def _http() -> requests.Session:
     """
@@ -417,6 +435,7 @@ IV_DEFAULTS = {
     "iv_last_wait":    None,
     "iv_skip_requested": False,
     "iv_role":         None,
+    "iv_language":     None,
 }
 for _k, _v in IV_DEFAULTS.items():
     if _k not in st.session_state:
@@ -586,10 +605,16 @@ with st.sidebar:
                 f'<div class="ri-side-stat"><span class="k">Target role</span>'
                 f'<span class="v">{st.session_state["iv_role"]}</span></div>'
             )
+        language_stat = ""
+        if st.session_state.get("iv_language"):
+            language_stat = (
+                f'<div class="ri-side-stat"><span class="k">Language</span>'
+                f'<span class="v">{st.session_state["iv_language"]}</span></div>'
+            )
         st.markdown(
             f'<div class="ri-side-stat"><span class="k">Skills detected</span>'
             f'<span class="v">{len(skills)}</span></div>'
-            f'{role_stat}'
+            f'{role_stat}{language_stat}'
             f'<div class="ri-side-stat"><span class="k">Round</span>'
             f'<span class="v">{(st.session_state.get("iv_current_round") or st.session_state.get("iv_round") or "hr").title()}</span></div>'
             f'<div class="ri-side-stat"><span class="k">Difficulty</span>'
@@ -680,6 +705,7 @@ def _call_next_question(
     max_questions=MAX_INTERVIEW_QUESTIONS,
     session_id=None,
     role=None,
+    language=None,
 ):
     payload = {
         "count": count,
@@ -697,6 +723,8 @@ def _call_next_question(
         payload["session_id"] = session_id
     if role:
         payload["role"] = role
+    if language:
+        payload["language"] = language
     r = _http().post(f"{BACKEND_BASE}/next-question", json=payload, timeout=180)
     r.raise_for_status()
     return r.json()
@@ -720,6 +748,7 @@ def _next_question_signature(state, cleaned, session_id):
         session_id,
         tuple(cleaned.get("skills", [])),
         state.get("iv_role"),
+        state.get("iv_language"),
     )
 
 
@@ -751,6 +780,7 @@ def _start_prefetch(state, cleaned, session_id):
         MAX_INTERVIEW_QUESTIONS,
         session_id,
         state.get("iv_role"),
+        state.get("iv_language"),
     )
     state["iv_prefetch"] = future
     state["iv_prefetch_sig"] = signature
@@ -773,10 +803,12 @@ def _take_prefetch(state, cleaned, session_id):
         return None
 
 
-def _call_evaluate(question, answer, answer_type, coaching_hint=None):
+def _call_evaluate(question, answer, answer_type, coaching_hint=None, language=None):
     payload = {"question": question, "answer": answer, "answer_type": answer_type}
     if coaching_hint and str(coaching_hint).strip():
         payload["coaching_hint"] = str(coaching_hint).strip()[:800]
+    if language:
+        payload["language"] = language
     r = _http().post(f"{BACKEND_BASE}/evaluate-answer", json=payload, timeout=200)
     r.raise_for_status()
     return r.json()
@@ -851,10 +883,13 @@ def _speak_text_button(text: str, key: str, label: str = "🔊 Listen to the que
     )
 
 
-def _call_session_start(store_consent=False):
+def _call_session_start(store_consent=False, language=None):
+    body = {"store_consent": bool(store_consent)}
+    if language:
+        body["language"] = language
     r = _http().post(
         f"{BACKEND_BASE}/session/start",
-        json={"store_consent": bool(store_consent)},
+        json=body,
         headers=_auth_headers(),
         timeout=10,
     )
@@ -1284,6 +1319,24 @@ with tab_interview:
         elif role_choice != "None":
             role_value = role_choice
 
+        language_choice = st.selectbox(
+            "Interview language (optional)",
+            LANGUAGE_PRESETS, index=0, key="iv_language_preset",
+            help="Questions, evaluation feedback, and the final report's written summary "
+                 "are generated in this language. The app's own buttons and labels stay "
+                 "English. Relies on the underlying AI model's language ability — quality "
+                 "may vary by language.",
+        )
+        language_value = None
+        if language_choice == "Custom...":
+            custom_language = st.text_input(
+                "Enter a language", key="iv_language_custom",
+                placeholder="e.g. Korean, Italian, Vietnamese",
+            )
+            language_value = custom_language.strip() if custom_language else None
+        elif language_choice != "English":
+            language_value = language_choice
+
         # Persistence is only offered when the backend actually has a database
         # configured — asking for consent to something that's a no-op would be
         # confusing. See services/db.py and PRIVACY.md.
@@ -1307,7 +1360,9 @@ with tab_interview:
                     try:
                         # Session is created first so the resume parse can be
                         # tied to it (and persisted, if consent was given).
-                        session_id = _call_session_start(store_consent=store_consent)
+                        session_id = _call_session_start(
+                            store_consent=store_consent, language=language_value,
+                        )
                         _, cleaned = _call_parse(
                             text=resume_text.strip() if resume_text else None,
                             file=resume_file,
@@ -1321,6 +1376,7 @@ with tab_interview:
                         st.session_state["iv_setup_done"] = True
                         st.session_state["iv_session_id"] = session_id
                         st.session_state["iv_role"]       = role_value
+                        st.session_state["iv_language"]   = language_value
                         st.rerun()
                     except requests.exceptions.ConnectionError:
                         st.error("Cannot connect to backend. Run: `uvicorn app.main:app --reload`")
@@ -1470,6 +1526,7 @@ with tab_interview:
                                 answer=user_answer.strip(),
                                 answer_type=cur_round,
                                 coaching_hint=hint,
+                                language=st.session_state.get("iv_language"),
                             )
                             st.session_state["iv_eval_result"] = eval_result
                             st.session_state["iv_evaluated"]   = True
@@ -1592,6 +1649,7 @@ with tab_interview:
                         max_questions=MAX_INTERVIEW_QUESTIONS,
                         session_id=session_id,
                         role=st.session_state.get("iv_role"),
+                        language=st.session_state.get("iv_language"),
                     )
                     st.session_state["iv_last_wait"] = time.time() - started_wait
                     q = result["question"]

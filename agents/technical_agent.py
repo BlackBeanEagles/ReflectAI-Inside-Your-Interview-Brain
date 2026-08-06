@@ -36,12 +36,15 @@ LLM_ERROR_PREFIXES = (
 
 # ─── Prompt Builders ──────────────────────────────────────────────────────────
 
-def _build_skill_prompt(skill: str, difficulty: str = "medium", role: Optional[str] = None) -> str:
+def _build_skill_prompt(
+    skill: str, difficulty: str = "medium", role: Optional[str] = None, language: Optional[str] = None,
+) -> str:
     """
     Day 3 style — skill-only technical question prompt.
     Produces a concept or real-world usage question for a single skill.
     """
     role_line = f"Target role: {role}\n" if role else ""
+    language_rule = f"- Write the question in {language}.\n" if language else ""
     return f"""You are a technical interviewer conducting a real job interview.
 
 Your task is to ask ONE technical interview question based on the candidate's skill.
@@ -60,12 +63,16 @@ Rules — follow every rule strictly:
 - Do NOT answer the question yourself.
 - Keep it concise and professional.
 - The question must end with a question mark (?).
-
+{language_rule}
 Output only the question — nothing else:"""
 
 
 def _build_context_prompt(
-    skills: List[str], project: str, difficulty: str = "medium", role: Optional[str] = None,
+    skills: List[str],
+    project: str,
+    difficulty: str = "medium",
+    role: Optional[str] = None,
+    language: Optional[str] = None,
 ) -> str:
     """
     Day 4 style — context-aware prompt that links a skill to a real project.
@@ -73,6 +80,7 @@ def _build_context_prompt(
     """
     skills_str = ", ".join(skills) if skills else "general programming"
     role_line = f"Target role: {role}\n" if role else ""
+    language_rule = f"- Write the question in {language}.\n" if language else ""
     return f"""You are a technical interviewer conducting a real job interview.
 
 Your task is to ask ONE technical question based on the candidate's real project experience.
@@ -94,7 +102,7 @@ Rules — follow every rule strictly:
 - Do NOT answer the question yourself.
 - Keep it professional and concise.
 - The question must end with a question mark (?).
-
+{language_rule}
 Output only the question — nothing else:"""
 
 
@@ -141,6 +149,7 @@ def generate_technical_question(
     used_skills: Optional[List[str]] = None,
     difficulty: str = "medium",
     role: Optional[str] = None,
+    language: Optional[str] = None,
 ) -> str:
     """
     Generate a technical interview question.
@@ -160,6 +169,8 @@ def generate_technical_question(
         difficulty:  Week 4 adaptive difficulty: easy, medium, or hard.
         role:        Optional industry/role preset (e.g. "Backend Engineer")
                      biasing the question's framing toward that role's domain.
+        language:    Optional interview-content language (e.g. "Spanish").
+                     None (default) means English — unchanged prior behavior.
 
     Returns:
         A single clean technical interview question string.
@@ -189,13 +200,13 @@ def generate_technical_question(
             skills,
             available_skills,
         )
-        prompt = _build_context_prompt(available_skills, project, difficulty, role)
+        prompt = _build_context_prompt(available_skills, project, difficulty, role, language)
 
     # ── Day 3: Skill-only question ─────────────────────────────────────────
     else:
         skill = random.choice(available_skills)
         logger.info("Technical Agent (skill-based) — skill: '%s'", skill)
-        prompt = _build_skill_prompt(skill, difficulty, role)
+        prompt = _build_skill_prompt(skill, difficulty, role, language)
 
     raw_response = call_llm(prompt, purpose="question")
 

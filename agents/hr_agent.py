@@ -11,12 +11,14 @@ Architecture:
 
 import re
 import logging
+from typing import Optional
+
 from utils.llm import call_llm
 
 logger = logging.getLogger(__name__)
 
 
-def _build_prompt(context: str) -> str:
+def _build_prompt(context: str, language: Optional[str] = None) -> str:
     """
     Builds a structured, production-grade prompt that turns the LLM into
     a controlled HR interviewer — not a random text generator.
@@ -29,6 +31,16 @@ def _build_prompt(context: str) -> str:
         5. OUTPUT FORMAT — what clean output looks like
         6. INSTRUCTION   — final trigger to execute
     """
+    # The English question-starter list below only makes sense in English —
+    # asking for a non-English question but requiring it start with an
+    # English word would fight the model. Drop that one rule when a
+    # language is set instead of translating a fixed word list badly.
+    starter_rule = (
+        "- Begin with one of: Tell me, Can you, Describe, How did, How do, "
+        "How would, What did, What would, Could you.\n"
+        if not language else ""
+    )
+    language_rule = f"- Write the question in {language}.\n" if language else ""
     return f"""You are a professional HR interviewer conducting a real job interview.
 
 Your ONLY task is to ask ONE behavioral interview question based on the candidate's background.
@@ -46,8 +58,7 @@ Rules — follow every rule strictly:
 - Make it realistic and situation-based — rooted in the candidate's background above.
 - Focus on past behavior, experience, attitude, or personality — NOT technical skills.
 - The question must end with a question mark (?).
-- Begin with one of: Tell me, Can you, Describe, How did, How do, How would, What did, What would, Could you.
-
+{starter_rule}{language_rule}
 Example output (this exact format — nothing else):
 Can you describe a time when you had to manage competing priorities at work?
 
@@ -98,7 +109,7 @@ def _clean_output(raw: str) -> str:
     return cleaned.strip()
 
 
-def generate_hr_question(context: str) -> str:
+def generate_hr_question(context: str, language: Optional[str] = None) -> str:
     """
     Main HR Agent function.
 
@@ -106,7 +117,9 @@ def generate_hr_question(context: str) -> str:
     calls LLM, cleans output, and returns a single professional question.
 
     Args:
-        context: Resume summary, job role, or candidate background.
+        context:  Resume summary, job role, or candidate background.
+        language: Optional interview-content language (e.g. "Spanish").
+            None (default) means English — unchanged prior behavior.
 
     Returns:
         A single clean behavioral HR interview question.
@@ -118,7 +131,7 @@ def generate_hr_question(context: str) -> str:
         logger.warning("HR Agent received empty context — returning fallback question.")
         return "Can you tell me about yourself and what motivates you professionally?"
 
-    prompt = _build_prompt(context.strip())
+    prompt = _build_prompt(context.strip(), language)
     raw_response = call_llm(prompt, purpose="question")
 
     # If LLM utility returned an error string, pass it through without cleaning

@@ -48,6 +48,7 @@ def evaluate_answer_endpoint(request: EvaluateRequest):
         answer=request.answer,
         answer_type=request.answer_type,
         coaching_hint=request.coaching_hint,
+        language=(request.language or "").strip() or None,
     )
 
     feedback = FeedbackDetail(

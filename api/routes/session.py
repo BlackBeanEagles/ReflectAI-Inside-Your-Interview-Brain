@@ -64,7 +64,10 @@ def start_session(
     subsequent session calls.
     """
     user_id = current["user_id"] if current else None
-    session_id = session_manager.create_session(store_consent=request.store_consent, user_id=user_id)
+    language = (request.language or "").strip() or None
+    session_id = session_manager.create_session(
+        store_consent=request.store_consent, user_id=user_id, language=language,
+    )
     logger.info("session: Created session %s", session_id)
     return SessionStartResponse(session_id=session_id)
 
@@ -176,7 +179,7 @@ def generate_final_report(session_id: str):
         len(history),
     )
 
-    report = generate_report(history)
+    report = generate_report(history, language=session_manager.get_session_language(session_id))
 
     # Compare against the user's own past sessions BEFORE saving this one,
     # so the comparison never includes the report being generated right now.
@@ -224,7 +227,7 @@ def download_report_pdf(session_id: str, current=Depends(get_optional_user)):
     call too.
     """
     history = session_manager.get_session(session_id)
-    report = generate_report(history)
+    report = generate_report(history, language=session_manager.get_session_language(session_id))
 
     user_id = session_manager.get_session_user_id(session_id)
     if user_id is not None and db.is_enabled():

@@ -242,6 +242,8 @@ class NextQuestionRequest(BaseModel):
     # biasing HR/technical/stress question content toward that domain.
     # None behaves exactly as before this feature existed.
     role: Optional[str] = None
+    # Optional interview-content language (e.g. "Spanish"). None means English.
+    language: Optional[str] = None
 
 
 class NextQuestionResponse(BaseModel):
@@ -289,6 +291,11 @@ class EvaluateRequest(BaseModel):
     answer: str
     answer_type: str = "technical"
     coaching_hint: Optional[str] = None
+    # Optional interview-content language (e.g. "Spanish") for the feedback
+    # text (strength/weakness/improvement). None means English. The
+    # underlying score labels (Correctness, Clarity, ...) always stay in
+    # English internally -- that's a parsing contract, not user-facing text.
+    language: Optional[str] = None
 
     @field_validator("answer_type")
     @classmethod
@@ -405,6 +412,11 @@ class SessionStartRequest(BaseModel):
     PRIVACY.md). Defaults to False — no persistence without opt-in.
     """
     store_consent: bool = False
+    # Optional interview-content language (e.g. "Spanish") applied to every
+    # question, evaluation, and the final report for this session. None
+    # (the default) means English — the exact prior behavior. Only the
+    # LLM-generated content changes; the app's own UI text is unaffected.
+    language: Optional[str] = None
 
 
 class SessionStartResponse(BaseModel):

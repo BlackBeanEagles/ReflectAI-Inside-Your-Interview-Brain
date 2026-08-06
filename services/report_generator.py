@@ -420,7 +420,7 @@ def _detect_patterns(history: List[Dict]) -> Dict:
 
 # ── LLM summary ───────────────────────────────────────────────────────────────
 
-def _build_summary_prompt(data: Dict) -> str:
+def _build_summary_prompt(data: Dict, language: Optional[str] = None) -> str:
     """Build the prompt that asks Ollama to generate a professional summary paragraph."""
     overall    = data.get("overall_score", 0)
     hr_score   = data.get("hr_score")
@@ -471,15 +471,16 @@ Instructions:
 - Highlight what the candidate demonstrated well and what requires focused improvement
 - End with one clear, actionable recommendation
 - Keep the response under 100 words
-- Do NOT use bullet points — write flowing prose only"""
+- Do NOT use bullet points — write flowing prose only
+{f"- Write the summary in {language}." if language else ""}"""
 
 
-def _generate_llm_summary(data: Dict) -> str:
+def _generate_llm_summary(data: Dict, language: Optional[str] = None) -> str:
     """
     Use Ollama to generate a natural-language interview summary.
     Falls back to a template summary if LLM is unavailable.
     """
-    prompt = _build_summary_prompt(data)
+    prompt = _build_summary_prompt(data, language)
     raw = call_llm(prompt, purpose="report")
 
     if raw.startswith(LLM_ERROR_PREFIXES):
@@ -506,12 +507,18 @@ def _generate_llm_summary(data: Dict) -> str:
 
 # ── Main entry point ───────────────────────────────────────────────────────────
 
-def generate_report(history: List[Dict]) -> Dict:
+def generate_report(history: List[Dict], language: Optional[str] = None) -> Dict:
     """
     Generate the final interview report from a list of stored interactions.
 
     Args:
-        history: List of interaction dicts returned by session_manager.get_session().
+        history:  List of interaction dicts returned by session_manager.get_session().
+        language: Optional interview-content language (e.g. "Spanish") for the
+            LLM-generated summary and cognitive coach text. None means English.
+            Deterministic parts of the report (scores, patterns, behavior tags)
+            are Python-templated and stay in English regardless -- translating
+            those would need per-language template strings, not an LLM call,
+            and is out of scope for this pass.
 
     Returns:
         Structured report dict — never raises.
@@ -573,7 +580,9 @@ def generate_report(history: List[Dict]) -> Dict:
     # report generation was previously paying for both round-trips back to back.
     def _cognitive():
         try:
-            cog = build_week5_cognitive_block(history, combined.get("behavior_summary", ""))
+            cog = build_week5_cognitive_block(
+                history, combined.get("behavior_summary", ""), language=language,
+            )
             cog.pop("per_answer_impulsivity", None)
             return cog
         except Exception as exc:
@@ -581,7 +590,7 @@ def generate_report(history: List[Dict]) -> Dict:
             return None
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        summary_future = pool.submit(_generate_llm_summary, combined)
+        summary_future = pool.submit(_generate_llm_summary, combined, language)
         cognitive_future = pool.submit(_cognitive)
         combined["summary"] = summary_future.result()
         combined["cognitive"] = cognitive_future.result()

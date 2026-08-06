@@ -110,6 +110,7 @@ def run_interview_step(
     max_questions: int = 10,
     session_id: Optional[str] = None,
     role: Optional[str] = None,
+    language: Optional[str] = None,
 ) -> Dict:
     """
     Execute one step of the interview pipeline.
@@ -136,6 +137,8 @@ def run_interview_step(
                         "Data Analyst") biasing HR/technical/stress question
                         content toward that domain. None preserves the exact
                         prior behavior for anyone not using this feature.
+        language:       Optional interview-content language (e.g. "Spanish").
+                        None means English — unchanged prior behavior.
 
     Returns:
         {
@@ -202,12 +205,13 @@ def run_interview_step(
             )
         elif current_round == "hr":
             context = _build_hr_context(cleaned_data, role)
-            question = generate_hr_question(context)
+            question = generate_hr_question(context, language=language)
         elif current_round == "stress":
             stress_result = generate_stress_question(
                 skills=cleaned_data.get("skills", []),
                 difficulty=decision["difficulty"],
                 role=role,
+                language=language,
             )
             question = stress_result["question"]
             question_type = stress_result.get("question_type", "rapid")
@@ -223,6 +227,7 @@ def run_interview_step(
                 projects=cleaned_data.get("projects", []),
                 difficulty=decision["difficulty"],
                 role=role,
+                language=language,
             )
     except Exception as e:
         logger.error("interview_service: Agent execution failed: %s", str(e))

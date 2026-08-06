@@ -210,6 +210,7 @@ def next_question_endpoint(request: NextQuestionRequest):
         max_questions=request.max_questions,
         session_id=sid,
         role=(request.role or "").strip() or None,
+        language=(request.language or "").strip() or None,
     )
 
     return NextQuestionResponse(

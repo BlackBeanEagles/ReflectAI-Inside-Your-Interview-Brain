@@ -60,6 +60,7 @@ def _build_evaluation_prompt(
     answer: str,
     answer_type: str,
     coaching_hint: Optional[str] = None,
+    language: Optional[str] = None,
 ) -> str:
     """
     Build a single structured prompt that asks the LLM to:
@@ -92,6 +93,17 @@ Session cognitive coaching context (use to shape weakness/improvement tone, not 
 {str(coaching_hint).strip()[:500]}
 """
 
+    # The line LABELS below (Correctness, Final Score, Strength, ...) are a
+    # parsing contract with _parse_score_line/_parse_text_line -- they must
+    # stay in English regardless of language, or the regex that extracts
+    # scores/feedback from the response breaks. Only the sentence CONTENT
+    # after each label should be written in the target language.
+    language_rule = (
+        f"- Keep every line label below (the words before each colon) exactly as shown, in English.\n"
+        f"- Write the actual sentence content for Strength, Weakness, and Improvement in {language}.\n"
+        if language else ""
+    )
+
     return f"""You are an expert interview evaluator and coach.
 
 Question: {question}
@@ -115,7 +127,7 @@ Instructions:
 - Do NOT repeat the question or answer
 - Do NOT hallucinate facts
 - Keep all text concise and professional
-
+{language_rule}
 Output EXACTLY in this format (nothing else before or after):
 {dim_lines}
 Final Score: [average]
@@ -260,6 +272,7 @@ def evaluate_answer(
     answer: str,
     answer_type: str = "technical",
     coaching_hint: Optional[str] = None,
+    language: Optional[str] = None,
 ) -> Dict:
     """
     Evaluate a single interview answer.
@@ -272,6 +285,13 @@ def evaluate_answer(
         answer:      The candidate's answer.
         answer_type: "technical" or "hr" — determines which criteria to apply.
         coaching_hint: Optional Week 5 line (thinking style / tone) for feedback wording.
+        language:    Optional interview-content language (e.g. "Spanish") for the
+            feedback sentence content. None means English. Best-effort: relies on
+            the model both writing content in the target language AND keeping
+            the English line labels intact for parsing — see
+            _build_evaluation_prompt for the exact instruction. If the model
+            ignores the label-preservation instruction, parsing falls back to
+            the same generic English feedback text used on any parse miss.
 
     Returns:
         {
@@ -309,7 +329,7 @@ def evaluate_answer(
         return _too_short_result(answer_type)
 
     # ── Call LLM ─────────────────────────────────────────────────────────
-    prompt = _build_evaluation_prompt(question, answer, answer_type, coaching_hint)
+    prompt = _build_evaluation_prompt(question, answer, answer_type, coaching_hint, language)
     raw_response = call_llm(prompt, purpose="evaluation")
 
     if raw_response.startswith(LLM_ERROR_PREFIXES):
