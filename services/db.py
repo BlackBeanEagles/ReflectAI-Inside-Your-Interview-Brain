@@ -17,6 +17,7 @@ calls init_db() once at startup to create tables if they don't exist yet.
 import json
 import logging
 import os
+import time
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -64,77 +65,119 @@ def _get_pool():
 
 
 def init_db() -> None:
-    """Create tables if they don't exist. No-op if DATABASE_URL is unset."""
-    pool = _get_pool()
-    if pool is None:
-        if DATABASE_URL:
-            logger.warning("db: DATABASE_URL is set but the pool failed to initialize.")
-        else:
-            logger.info("db: DATABASE_URL not set — running without persistent storage.")
+    """
+    Create tables if they don't exist. No-op if DATABASE_URL is unset.
+
+    Retries a few times with a longer per-attempt timeout than normal request
+    queries get: a free-tier Neon compute that has scaled to zero (or a
+    brand-new project) can take several seconds to wake up for its very first
+    connection. This only runs once at process startup, so paying extra
+    latency here is cheap — but failing here is not: every other function in
+    this module only checks is_enabled() (DATABASE_URL is set), not whether
+    init_db() actually succeeded, so a single slow wakeup here used to
+    permanently disable persistence for the process's whole lifetime with
+    "relation does not exist" errors on every query.
+    """
+    if not DATABASE_URL:
+        logger.info("db: DATABASE_URL not set — running without persistent storage.")
         return
-    try:
-        with pool.connection() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    email TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    name TEXT,
-                    created_at TIMESTAMPTZ DEFAULT now()
+
+    attempts = 4
+    init_timeout_s = max(DB_CONNECT_TIMEOUT_S, 10)
+    last_error: Optional[Exception] = None
+
+    for attempt in range(1, attempts + 1):
+        try:
+            from psycopg_pool import ConnectionPool
+            with ConnectionPool(
+                DATABASE_URL,
+                min_size=0,
+                max_size=1,
+                open=True,
+                timeout=init_timeout_s,
+                kwargs={"connect_timeout": init_timeout_s},
+            ) as init_pool:
+                with init_pool.connection() as conn:
+                    _create_schema(conn)
+            logger.info("db: tables ready (attempt %d/%d).", attempt, attempts)
+            return
+        except Exception as exc:
+            last_error = exc
+            if attempt < attempts:
+                wait_s = 2 * attempt
+                logger.warning(
+                    "db: init_db attempt %d/%d failed (%s) — retrying in %ds.",
+                    attempt, attempts, exc, wait_s,
                 )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS resumes (
-                    id SERIAL PRIMARY KEY,
-                    session_id TEXT NOT NULL,
-                    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-                    raw_text TEXT,
-                    skills JSONB,
-                    projects JSONB,
-                    experience JSONB,
-                    created_at TIMESTAMPTZ DEFAULT now()
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS interactions (
-                    id SERIAL PRIMARY KEY,
-                    session_id TEXT NOT NULL,
-                    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-                    question TEXT,
-                    answer TEXT,
-                    round_type TEXT,
-                    scores JSONB,
-                    final_score REAL,
-                    feedback JSONB,
-                    response_time_seconds REAL,
-                    created_at TIMESTAMPTZ DEFAULT now()
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS reports (
-                    id SERIAL PRIMARY KEY,
-                    session_id TEXT NOT NULL,
-                    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-                    report JSONB,
-                    created_at TIMESTAMPTZ DEFAULT now()
-                )
-            """)
-            # Existing databases created before user_id existed won't have the
-            # column — add it defensively so upgrading doesn't require a
-            # manual migration step.
-            for table in ("resumes", "interactions", "reports"):
-                conn.execute(
-                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS user_id "
-                    f"INTEGER REFERENCES users(id) ON DELETE SET NULL"
-                )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_resumes_session ON resumes(session_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_interactions_session ON interactions(session_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_session ON reports(session_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id)")
-            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)")
-        logger.info("db: tables ready.")
-    except Exception:
-        logger.exception("db: init_db failed — persistence disabled for this process.")
+                time.sleep(wait_s)
+
+    logger.error(
+        "db: init_db failed after %d attempts — persistence disabled for this process. Last error: %s",
+        attempts, last_error,
+    )
+
+
+def _create_schema(conn) -> None:
+    """Run the CREATE TABLE / migration statements. Raises on failure — the
+    caller (init_db) owns retry and error-swallowing policy."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            name TEXT,
+            created_at TIMESTAMPTZ DEFAULT now()
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS resumes (
+            id SERIAL PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            raw_text TEXT,
+            skills JSONB,
+            projects JSONB,
+            experience JSONB,
+            created_at TIMESTAMPTZ DEFAULT now()
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS interactions (
+            id SERIAL PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            question TEXT,
+            answer TEXT,
+            round_type TEXT,
+            scores JSONB,
+            final_score REAL,
+            feedback JSONB,
+            response_time_seconds REAL,
+            created_at TIMESTAMPTZ DEFAULT now()
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS reports (
+            id SERIAL PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            report JSONB,
+            created_at TIMESTAMPTZ DEFAULT now()
+        )
+    """)
+    # Existing databases created before user_id existed won't have the
+    # column — add it defensively so upgrading doesn't require a
+    # manual migration step.
+    for table in ("resumes", "interactions", "reports"):
+        conn.execute(
+            f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS user_id "
+            f"INTEGER REFERENCES users(id) ON DELETE SET NULL"
+        )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_resumes_session ON resumes(session_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_interactions_session ON interactions(session_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_session ON reports(session_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id)")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)")
 
 
 def save_resume(session_id: str, raw_text: Optional[str], cleaned: Dict, user_id: Optional[int] = None) -> None:
