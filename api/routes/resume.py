@@ -25,6 +25,7 @@ from models.schemas import (
     DecisionResponse,
     NextQuestionRequest,
     NextQuestionResponse,
+    PredictQuestionsResponse,
     ResumeParseResponse,
     StressQuestionRequest,
     StressQuestionResponse,
@@ -37,6 +38,7 @@ from services.data_cleaner import clean_resume_data
 from services.decision_engine import decide_next_step
 from services.interview_service import run_interview_step
 from services.pdf_parser import extract_text_from_pdf_bytes
+from services.question_predictor import predict_questions
 from services.resume_processor import process_resume
 
 logger = logging.getLogger(__name__)
@@ -286,3 +288,60 @@ async def ats_score_endpoint(
         include_recruiter_take=include_recruiter_take,
     )
     return ATSScoreResponse(**result)
+
+
+@router.post("/predict-questions", response_model=PredictQuestionsResponse)
+async def predict_questions_endpoint(
+    text: Optional[str] = Form(None),
+    file: Optional[UploadFile] = File(None),
+    role: Optional[str] = Form(None),
+    job_description: Optional[str] = Form(None),
+    count: int = Form(10),
+):
+    """
+    POST /predict-questions
+
+    Generates a list of likely interview questions to prepare for, given a
+    resume (pasted text or PDF, same as /parse-resume) and/or a target role
+    / job description. This is a study/prep tool — separate from the live
+    adaptive mock interview flow (/next-question), which asks one question
+    at a time and evaluates the answer.
+
+    At least one of text, file, role, or job_description must be provided.
+    """
+    resume_text = ""
+    if file is not None:
+        pdf_bytes = await file.read()
+        if len(pdf_bytes) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Max upload size is {MAX_UPLOAD_MB:.0f}MB.",
+            )
+        resume_text = extract_text_from_pdf_bytes(pdf_bytes)
+        logger.info("predict-questions: PDF file received — name='%s'", file.filename)
+    elif text:
+        if len(text) > MAX_PASTE_CHARS:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Pasted text too long. Max is {MAX_PASTE_CHARS} characters.",
+            )
+        resume_text = text
+
+    if job_description and len(job_description) > MAX_JD_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Job description too long. Max is {MAX_JD_CHARS} characters.",
+        )
+
+    cleaned = {"skills": [], "projects": [], "experience": []}
+    if resume_text.strip():
+        cleaned = clean_resume_data(process_resume(text=resume_text))
+
+    result = predict_questions(
+        skills=cleaned.get("skills", []),
+        projects=cleaned.get("projects", []),
+        role=role.strip() if role else None,
+        job_description=job_description,
+        count=count,
+    )
+    return PredictQuestionsResponse(**result)

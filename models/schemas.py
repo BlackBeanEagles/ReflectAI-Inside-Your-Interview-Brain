@@ -125,6 +125,23 @@ class ATSScoreResponse(BaseModel):
     methodology: str
 
 
+# ─── Predicted Interview Questions ──────────────────────────────────────────
+
+class PredictedQuestionItem(BaseModel):
+    """One predicted interview question — a prep-list item, not a live
+    session question. See services/question_predictor.py."""
+    category: str  # "hr" | "technical" | "behavioral"
+    question: str
+    prep_tip: str
+
+
+class PredictQuestionsResponse(BaseModel):
+    """Output schema for /predict-questions."""
+    questions: List[PredictedQuestionItem]
+    error: bool = False
+    message: str = ""
+
+
 # ─── Week 2 Day 3+4 — Technical Agent ────────────────────────────────────────
 
 class TechnicalQuestionRequest(BaseModel):

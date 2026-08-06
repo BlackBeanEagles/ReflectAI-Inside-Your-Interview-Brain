@@ -589,8 +589,8 @@ with st.sidebar:
         )
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
-tab_interview, tab_resume, tab_ats, tab_history = st.tabs(
-    ["🎯 Interview Session", "📄 Resume Analysis", "✅ ATS Score", "📊 History"]
+tab_interview, tab_resume, tab_ats, tab_predict, tab_history = st.tabs(
+    ["🎯 Interview Session", "📄 Resume Analysis", "✅ ATS Score", "🔮 Predicted Questions", "📊 History"]
 )
 
 
@@ -621,6 +621,23 @@ def _call_ats_score(job_description, text=None, file=None, include_recruiter_tak
     else:
         r = _http().post(f"{BACKEND_BASE}/ats-score",
                          data={**data, "text": text}, timeout=30 if not include_recruiter_take else 60)
+    r.raise_for_status()
+    return r.json()
+
+
+def _call_predict_questions(text=None, file=None, role=None, job_description=None, count=10):
+    data = {"count": count}
+    if role:
+        data["role"] = role
+    if job_description:
+        data["job_description"] = job_description
+    if file is not None:
+        r = _http().post(f"{BACKEND_BASE}/predict-questions",
+                         files={"file": (file.name, file.getvalue(), "application/pdf")},
+                         data=data, timeout=45)
+    else:
+        r = _http().post(f"{BACKEND_BASE}/predict-questions",
+                         data={**data, "text": text}, timeout=45)
     r.raise_for_status()
     return r.json()
 
@@ -2040,6 +2057,98 @@ with tab_ats:
                     f'</div>',
                     unsafe_allow_html=True,
                 )
+
+
+with tab_predict:
+    st.markdown("### 🔮 Predicted Interview Questions")
+    st.markdown(
+        "Get a list of interview questions you should prepare for, generated from your "
+        "resume and/or a target role or job description. This is a **study tool** — a "
+        "prep list to read through, separate from the live adaptive mock interview in "
+        "the first tab."
+    )
+    st.markdown("")
+
+    for k, v in {"predict_result": None, "predict_error": None}.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+
+    pq_role = st.text_input(
+        "Target role (optional)",
+        placeholder="e.g. Backend Engineer, Data Analyst, DevOps Engineer",
+        key="pq_role_input",
+    )
+    pq_jd = st.text_area(
+        "Job description (optional)",
+        placeholder="Paste a job posting to bias questions toward what this specific role needs.",
+        height=120, key="pq_jd_input",
+    )
+
+    pq_input_method = st.radio("Resume input method (optional)", ["Paste text", "Upload PDF"],
+                                horizontal=True, key="pq_input_method")
+    pq_text, pq_file = None, None
+    if pq_input_method == "Paste text":
+        pq_text = st.text_area(
+            "Paste resume", height=160,
+            placeholder="Skills:\nPython, Django\n\nProjects:\nChatbot using NLP",
+            key="pq_resume_text",
+        )
+    else:
+        pq_file = st.file_uploader("Upload resume PDF", type=["pdf"], key="pq_resume_pdf")
+
+    pq_count = st.slider("How many questions?", min_value=5, max_value=20, value=10, key="pq_count")
+
+    if st.button("🔮  Predict Questions", type="primary", use_container_width=True, key="pq_predict_btn"):
+        st.session_state["predict_result"] = None
+        st.session_state["predict_error"] = None
+        has_resume = (pq_text and pq_text.strip()) or pq_file
+        has_role = pq_role and pq_role.strip()
+        has_jd = pq_jd and pq_jd.strip()
+        if not has_resume and not has_role and not has_jd:
+            st.warning("Add at least a resume, a target role, or a job description.")
+        else:
+            with st.spinner("Generating likely interview questions..."):
+                try:
+                    st.session_state["predict_result"] = _call_predict_questions(
+                        text=pq_text.strip() if pq_text else None,
+                        file=pq_file,
+                        role=pq_role.strip() if pq_role else None,
+                        job_description=pq_jd.strip() if pq_jd else None,
+                        count=pq_count,
+                    )
+                except requests.exceptions.ConnectionError:
+                    st.session_state["predict_error"] = "Cannot connect to backend."
+                except Exception as e:
+                    st.session_state["predict_error"] = _friendly_http_error(e)
+
+    if st.session_state.get("predict_error"):
+        st.error(st.session_state["predict_error"])
+
+    result = st.session_state.get("predict_result")
+    if result:
+        if result.get("error"):
+            st.error(result.get("message") or "Could not generate questions right now.")
+        else:
+            questions = result.get("questions", [])
+            st.divider()
+            st.caption(f"{len(questions)} question(s) generated — grouped by category.")
+
+            _cat_icons = {"technical": "🛠️", "hr": "💬", "behavioral": "🧭"}
+            _cat_labels = {"technical": "Technical", "hr": "HR", "behavioral": "Behavioral"}
+            for cat in ("technical", "hr", "behavioral"):
+                cat_questions = [q for q in questions if q.get("category") == cat]
+                if not cat_questions:
+                    continue
+                st.markdown(f"**{_cat_icons.get(cat, '')} {_cat_labels.get(cat, cat.title())}**")
+                for q in cat_questions:
+                    st.markdown(
+                        f'<div class="report-item report-rec">'
+                        f'<strong>{q.get("question", "")}</strong>'
+                        f'<br><span style="opacity:0.8;font-size:0.85em;">💡 {q.get("prep_tip", "")}</span>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                st.markdown("")
 
 
 with tab_history:
