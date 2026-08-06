@@ -78,6 +78,25 @@ HR_QUESTION_LIMIT = 2
 # Neplex Week 4 Day 5 — loop control (hard cap, prevents infinite interviews)
 MAX_INTERVIEW_QUESTIONS = 10
 
+# Industry/role presets — bias HR/technical/stress question content toward a
+# target role's domain (see agents/*.py and services/interview_service.py).
+# "None" preserves the exact prior behavior; "Custom..." reveals a free-text
+# field for anything not covered by the curated list below.
+ROLE_PRESETS = [
+    "None",
+    "Backend Engineer",
+    "Frontend Engineer",
+    "Full-Stack Engineer",
+    "Data Scientist",
+    "Data Analyst",
+    "DevOps / SRE",
+    "Mobile Developer",
+    "QA / Test Engineer",
+    "Product Manager",
+    "General Software Engineer",
+    "Custom...",
+]
+
 @st.cache_resource
 def _http() -> requests.Session:
     """
@@ -397,6 +416,7 @@ IV_DEFAULTS = {
     "iv_prefetch_sig": None,
     "iv_last_wait":    None,
     "iv_skip_requested": False,
+    "iv_role":         None,
 }
 for _k, _v in IV_DEFAULTS.items():
     if _k not in st.session_state:
@@ -560,9 +580,16 @@ with st.sidebar:
         cleaned = st.session_state.get("iv_cleaned") or {}
         skills = cleaned.get("skills", [])
         skills_preview = ", ".join(skills[:3]) + (f" +{len(skills)-3} more" if len(skills) > 3 else "")
+        role_stat = ""
+        if st.session_state.get("iv_role"):
+            role_stat = (
+                f'<div class="ri-side-stat"><span class="k">Target role</span>'
+                f'<span class="v">{st.session_state["iv_role"]}</span></div>'
+            )
         st.markdown(
             f'<div class="ri-side-stat"><span class="k">Skills detected</span>'
             f'<span class="v">{len(skills)}</span></div>'
+            f'{role_stat}'
             f'<div class="ri-side-stat"><span class="k">Round</span>'
             f'<span class="v">{(st.session_state.get("iv_current_round") or st.session_state.get("iv_round") or "hr").title()}</span></div>'
             f'<div class="ri-side-stat"><span class="k">Difficulty</span>'
@@ -652,6 +679,7 @@ def _call_next_question(
     stress_count,
     max_questions=MAX_INTERVIEW_QUESTIONS,
     session_id=None,
+    role=None,
 ):
     payload = {
         "count": count,
@@ -667,6 +695,8 @@ def _call_next_question(
     }
     if session_id:
         payload["session_id"] = session_id
+    if role:
+        payload["role"] = role
     r = _http().post(f"{BACKEND_BASE}/next-question", json=payload, timeout=180)
     r.raise_for_status()
     return r.json()
@@ -689,6 +719,7 @@ def _next_question_signature(state, cleaned, session_id):
         tuple(state["iv_used_skills"]),
         session_id,
         tuple(cleaned.get("skills", [])),
+        state.get("iv_role"),
     )
 
 
@@ -719,6 +750,7 @@ def _start_prefetch(state, cleaned, session_id):
         state["iv_stress_count"],
         MAX_INTERVIEW_QUESTIONS,
         session_id,
+        state.get("iv_role"),
     )
     state["iv_prefetch"] = future
     state["iv_prefetch_sig"] = signature
@@ -1235,6 +1267,23 @@ with tab_interview:
         else:
             resume_file = st.file_uploader("Upload resume PDF", type=["pdf"], key="iv_resume_file")
 
+        role_choice = st.selectbox(
+            "Target role / industry preset (optional)",
+            ROLE_PRESETS, index=0, key="iv_role_preset",
+            help="Biases HR, technical, and stress questions toward this role's domain — "
+                 "e.g. a Backend Engineer preset skews technical questions toward APIs, "
+                 "databases, and scaling rather than generic theory.",
+        )
+        role_value = None
+        if role_choice == "Custom...":
+            custom_role = st.text_input(
+                "Enter a custom role or industry", key="iv_role_custom",
+                placeholder="e.g. Machine Learning Engineer, Embedded Systems Engineer",
+            )
+            role_value = custom_role.strip() if custom_role else None
+        elif role_choice != "None":
+            role_value = role_choice
+
         # Persistence is only offered when the backend actually has a database
         # configured — asking for consent to something that's a no-op would be
         # confusing. See services/db.py and PRIVACY.md.
@@ -1271,6 +1320,7 @@ with tab_interview:
                         st.session_state["iv_cleaned"]    = cleaned
                         st.session_state["iv_setup_done"] = True
                         st.session_state["iv_session_id"] = session_id
+                        st.session_state["iv_role"]       = role_value
                         st.rerun()
                     except requests.exceptions.ConnectionError:
                         st.error("Cannot connect to backend. Run: `uvicorn app.main:app --reload`")
@@ -1541,6 +1591,7 @@ with tab_interview:
                         st.session_state["iv_stress_count"],
                         max_questions=MAX_INTERVIEW_QUESTIONS,
                         session_id=session_id,
+                        role=st.session_state.get("iv_role"),
                     )
                     st.session_state["iv_last_wait"] = time.time() - started_wait
                     q = result["question"]

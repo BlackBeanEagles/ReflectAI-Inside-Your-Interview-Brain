@@ -36,21 +36,23 @@ LLM_ERROR_PREFIXES = (
 
 # ─── Prompt Builders ──────────────────────────────────────────────────────────
 
-def _build_skill_prompt(skill: str, difficulty: str = "medium") -> str:
+def _build_skill_prompt(skill: str, difficulty: str = "medium", role: Optional[str] = None) -> str:
     """
     Day 3 style — skill-only technical question prompt.
     Produces a concept or real-world usage question for a single skill.
     """
+    role_line = f"Target role: {role}\n" if role else ""
     return f"""You are a technical interviewer conducting a real job interview.
 
 Your task is to ask ONE technical interview question based on the candidate's skill.
 
 Candidate Skill: {skill}
 Difficulty: {difficulty}
-
+{role_line}
 Rules — follow every rule strictly:
 - Ask ONLY one question. Never two.
 - Focus on concepts, internals, or real-world usage of {skill}.
+{f'- Frame the question the way a {role} interviewer would, relevant to that role.' if role else ''}
 - Match the requested difficulty: easy=definition, medium=concept, hard=advanced edge case.
 - Do NOT include any introduction, preamble, greeting, or label.
 - Do NOT write "Here is a question:", "Sure!", or anything similar.
@@ -62,12 +64,15 @@ Rules — follow every rule strictly:
 Output only the question — nothing else:"""
 
 
-def _build_context_prompt(skills: List[str], project: str, difficulty: str = "medium") -> str:
+def _build_context_prompt(
+    skills: List[str], project: str, difficulty: str = "medium", role: Optional[str] = None,
+) -> str:
     """
     Day 4 style — context-aware prompt that links a skill to a real project.
     Produces an implementation/challenge-focused question, not generic theory.
     """
     skills_str = ", ".join(skills) if skills else "general programming"
+    role_line = f"Target role: {role}\n" if role else ""
     return f"""You are a technical interviewer conducting a real job interview.
 
 Your task is to ask ONE technical question based on the candidate's real project experience.
@@ -75,11 +80,12 @@ Your task is to ask ONE technical question based on the candidate's real project
 Candidate Skills: {skills_str}
 Candidate Project: {project}
 Difficulty: {difficulty}
-
+{role_line}
 Rules — follow every rule strictly:
 - Ask ONLY one question. Never two.
 - Connect the question directly to the project "{project}".
 - Focus on HOW the candidate built it, what challenges they faced, or implementation decisions made.
+{f'- Frame the question the way a {role} interviewer would, relevant to that role.' if role else ''}
 - Match the requested difficulty: easy=basic implementation, medium=tradeoff, hard=edge case or scaling.
 - Do NOT ask generic theory questions — the question must reference the project.
 - Do NOT include any introduction, preamble, or label.
@@ -134,6 +140,7 @@ def generate_technical_question(
     projects: Optional[List[str]] = None,
     used_skills: Optional[List[str]] = None,
     difficulty: str = "medium",
+    role: Optional[str] = None,
 ) -> str:
     """
     Generate a technical interview question.
@@ -151,6 +158,8 @@ def generate_technical_question(
         projects:    List of project names (optional, from data_cleaner).
         used_skills: Skills already asked about in this session (Day 7 anti-repetition).
         difficulty:  Week 4 adaptive difficulty: easy, medium, or hard.
+        role:        Optional industry/role preset (e.g. "Backend Engineer")
+                     biasing the question's framing toward that role's domain.
 
     Returns:
         A single clean technical interview question string.
@@ -180,13 +189,13 @@ def generate_technical_question(
             skills,
             available_skills,
         )
-        prompt = _build_context_prompt(available_skills, project, difficulty)
+        prompt = _build_context_prompt(available_skills, project, difficulty, role)
 
     # ── Day 3: Skill-only question ─────────────────────────────────────────
     else:
         skill = random.choice(available_skills)
         logger.info("Technical Agent (skill-based) — skill: '%s'", skill)
-        prompt = _build_skill_prompt(skill, difficulty)
+        prompt = _build_skill_prompt(skill, difficulty, role)
 
     raw_response = call_llm(prompt, purpose="question")
 

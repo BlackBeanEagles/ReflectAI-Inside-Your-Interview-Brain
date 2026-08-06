@@ -66,8 +66,9 @@ def _normalise_difficulty(difficulty: str) -> str:
     return difficulty if difficulty in DIFFICULTIES else "medium"
 
 
-def _build_prompt(skills: List[str], difficulty: str, question_type: str) -> str:
+def _build_prompt(skills: List[str], difficulty: str, question_type: str, role: Optional[str] = None) -> str:
     skills_text = ", ".join(skills) if skills else "general programming"
+    role_line = f"Target role: {role}\n" if role else ""
     return f"""You are a strict technical interviewer conducting a rapid-fire stress round.
 
 Your task:
@@ -81,7 +82,7 @@ Your task:
 Candidate Skills: {skills_text}
 Difficulty: {difficulty}
 Question Type: {question_type}
-
+{role_line}
 Output only the question."""
 
 
@@ -119,9 +120,16 @@ def generate_stress_question(
     skills: List[str],
     difficulty: str = "medium",
     question_type: Optional[str] = None,
+    role: Optional[str] = None,
 ) -> dict:
     """
     Generate one rapid-fire stress-round question.
+
+    Args:
+        role: Optional industry/role preset biasing question framing. The
+            terse fallback templates (FALLBACK_QUESTIONS) are deliberately
+            NOT role-aware -- they're a last resort for LLM failure, not
+            worth a combinatorial explosion of per-role variants.
 
     Returns:
         {
@@ -136,7 +144,7 @@ def generate_stress_question(
     if question_type not in QUESTION_TYPES:
         question_type = random.choice(QUESTION_TYPES)
 
-    prompt = _build_prompt(skills=skills, difficulty=difficulty, question_type=question_type)
+    prompt = _build_prompt(skills=skills, difficulty=difficulty, question_type=question_type, role=role)
     raw_response = call_llm(prompt, purpose="question")
 
     if raw_response.startswith(LLM_ERROR_PREFIXES):

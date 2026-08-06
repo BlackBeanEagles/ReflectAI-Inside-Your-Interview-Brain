@@ -238,6 +238,10 @@ class NextQuestionRequest(BaseModel):
     stress_count: int = 0
     max_questions: int = 10
     session_id: Optional[str] = None
+    # Optional industry/role preset (e.g. "Backend Engineer", "Data Analyst")
+    # biasing HR/technical/stress question content toward that domain.
+    # None behaves exactly as before this feature existed.
+    role: Optional[str] = None
 
 
 class NextQuestionResponse(BaseModel):

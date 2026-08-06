@@ -53,12 +53,15 @@ LLM_ERROR_PREFIXES = (
 
 # ─── Context builder for HR agent ────────────────────────────────────────────
 
-def _build_hr_context(cleaned_data: Dict[str, List[str]]) -> str:
+def _build_hr_context(cleaned_data: Dict[str, List[str]], role: Optional[str] = None) -> str:
     """
     Convert cleaned resume data into a natural-language context string
     suitable for the HR agent's prompt.
     """
     parts = []
+
+    if role:
+        parts.append(f"Applying for: {role}.")
 
     skills = cleaned_data.get("skills", [])
     projects = cleaned_data.get("projects", [])
@@ -106,6 +109,7 @@ def run_interview_step(
     stress_count: int = 0,
     max_questions: int = 10,
     session_id: Optional[str] = None,
+    role: Optional[str] = None,
 ) -> Dict:
     """
     Execute one step of the interview pipeline.
@@ -128,6 +132,10 @@ def run_interview_step(
         max_questions:  Hard cap for the interview.
         session_id:     When set, loads session history and applies Week 5 Day 7
                         cognitive nudges inside decide_next_step.
+        role:           Optional industry/role preset (e.g. "Backend Engineer",
+                        "Data Analyst") biasing HR/technical/stress question
+                        content toward that domain. None preserves the exact
+                        prior behavior for anyone not using this feature.
 
     Returns:
         {
@@ -193,12 +201,13 @@ def run_interview_step(
                 "performance and behavioural summary."
             )
         elif current_round == "hr":
-            context = _build_hr_context(cleaned_data)
+            context = _build_hr_context(cleaned_data, role)
             question = generate_hr_question(context)
         elif current_round == "stress":
             stress_result = generate_stress_question(
                 skills=cleaned_data.get("skills", []),
                 difficulty=decision["difficulty"],
+                role=role,
             )
             question = stress_result["question"]
             question_type = stress_result.get("question_type", "rapid")
@@ -213,6 +222,7 @@ def run_interview_step(
                 skills=available_skills,
                 projects=cleaned_data.get("projects", []),
                 difficulty=decision["difficulty"],
+                role=role,
             )
     except Exception as e:
         logger.error("interview_service: Agent execution failed: %s", str(e))

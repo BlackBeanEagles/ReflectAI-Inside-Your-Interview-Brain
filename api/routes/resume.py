@@ -209,6 +209,7 @@ def next_question_endpoint(request: NextQuestionRequest):
         stress_count=request.stress_count,
         max_questions=request.max_questions,
         session_id=sid,
+        role=(request.role or "").strip() or None,
     )
 
     return NextQuestionResponse(
