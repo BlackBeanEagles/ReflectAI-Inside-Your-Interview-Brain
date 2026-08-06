@@ -475,6 +475,10 @@ class ReportResponse(BaseModel):
     behavior_tags:        List[str] = []
     behavior_summary:     str = ""
     cognitive: Optional[Dict[str, Any]] = None
+    # Only populated for a logged-in user with at least one prior saved
+    # report — a real comparison against their own history, never a
+    # fabricated population statistic. See services/history_analytics.py.
+    comparison: Optional[Dict[str, Any]] = None
 
 
 # ─── Week 5 Day 5 — Counterfactual replay ────────────────────────────────────

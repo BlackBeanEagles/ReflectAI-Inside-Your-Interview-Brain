@@ -818,6 +818,13 @@ def _call_generate_report(session_id):
     return r.json()
 
 
+def _call_report_pdf(session_id):
+    r = _http().get(f"{BACKEND_BASE}/session/{session_id}/report/pdf",
+                    headers=_auth_headers(), timeout=200)
+    r.raise_for_status()
+    return r.content
+
+
 def _score_ring_class(label: str) -> str:
     mapping = {
         "Excellent": "ring-excellent",
@@ -946,6 +953,31 @@ def _render_report(report: dict):
 
     st.caption(f"Based on {n} evaluated answer{'s' if n != 1 else ''}")
     st.markdown("")
+
+    # ── Comparison to your own past sessions (logged-in users only) ────────
+    comparison = report.get("comparison")
+    if comparison:
+        st.markdown("**📈 Compared to your past sessions**")
+        comp_cols = st.columns(len(comparison))
+        _labels = {
+            "overall_score": "Overall", "hr_score": "HR", "technical_score": "Technical", "stress_score": "Stress",
+        }
+        for col, (field, data) in zip(comp_cols, comparison.items()):
+            with col:
+                delta = data["delta"]
+                arrow = "🔼" if delta > 0 else ("🔽" if delta < 0 else "➡️")
+                color = "#1a7a44" if delta > 0 else ("#c0470a" if delta < 0 else "#888")
+                st.markdown(
+                    f'<div class="score-panel">'
+                    f'<div class="big-num" style="font-size:1.4rem;color:{color};">{arrow} {delta:+.1f}</div>'
+                    f'<div class="panel-label">{_labels.get(field, field)}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+        st.caption(
+            "Based on your own prior saved sessions — not a comparison to other candidates."
+        )
+        st.markdown("")
 
     # ── Summary ───────────────────────────────────────────────────────────
     if summary:
@@ -1558,11 +1590,25 @@ with tab_interview:
                 st.markdown("")
                 _render_report(st.session_state["iv_report"])
 
-                # Allow regeneration
-                if st.button("🔄  Regenerate Report", key="iv_regen_report"):
-                    st.session_state["iv_report_done"] = False
-                    st.session_state["iv_report"]      = None
-                    st.rerun()
+                dl_col, regen_col = st.columns([2, 1])
+                with dl_col:
+                    try:
+                        pdf_bytes = _call_report_pdf(session_id)
+                        st.download_button(
+                            "⬇️  Download PDF",
+                            data=pdf_bytes,
+                            file_name=f"interview_report_{session_id[:8]}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True,
+                            key="iv_report_pdf_dl",
+                        )
+                    except Exception:
+                        st.caption("PDF download unavailable right now.")
+                with regen_col:
+                    if st.button("🔄  Regenerate Report", key="iv_regen_report", use_container_width=True):
+                        st.session_state["iv_report_done"] = False
+                        st.session_state["iv_report"]      = None
+                        st.rerun()
 
         # ── Question history ──────────────────────────────────────────────
         history = st.session_state["iv_history"]

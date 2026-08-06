@@ -20,6 +20,8 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from fastapi.responses import Response
+
 from api.routes.auth import get_optional_user
 from models.schemas import (
     SessionStartRequest,
@@ -32,6 +34,8 @@ from models.schemas import (
     ReplayCompareResponse,
 )
 from services import db, session_manager
+from services.history_analytics import compare_to_past_reports
+from services.pdf_report import generate_report_pdf
 from services.report_generator import generate_report
 from services.replay_learning import compare_answer_versions
 
@@ -172,8 +176,16 @@ def generate_final_report(session_id: str):
     )
 
     report = generate_report(history)
+
+    # Compare against the user's own past sessions BEFORE saving this one,
+    # so the comparison never includes the report being generated right now.
+    user_id = session_manager.get_session_user_id(session_id)
+    if user_id is not None and db.is_enabled():
+        past_reports = db.get_user_reports(user_id)
+        report["comparison"] = compare_to_past_reports(report, past_reports)
+
     if session_manager.has_store_consent(session_id):
-        db.save_report(session_id, report, user_id=session_manager.get_session_user_id(session_id))
+        db.save_report(session_id, report, user_id=user_id)
 
     return ReportResponse(
         overall_score   = report.get("overall_score")   or 0.0,
@@ -193,6 +205,40 @@ def generate_final_report(session_id: str):
         behavior_tags         = report.get("behavior_tags", []) or [],
         behavior_summary      = report.get("behavior_summary", "") or "",
         cognitive             = report.get("cognitive"),
+        comparison            = report.get("comparison"),
+    )
+
+
+# ─── GET /session/{session_id}/report/pdf ────────────────────────────────────
+
+@router.get("/{session_id}/report/pdf")
+def download_report_pdf(session_id: str, current=Depends(get_optional_user)):
+    """
+    Same report as POST /{session_id}/report, rendered as a downloadable PDF.
+
+    Regenerates the report fresh (cheap — no LLM calls beyond what the JSON
+    endpoint already does) rather than requiring the caller to have hit the
+    JSON endpoint first, so this works as a standalone "just give me the PDF"
+    call too.
+    """
+    history = session_manager.get_session(session_id)
+    report = generate_report(history)
+
+    user_id = session_manager.get_session_user_id(session_id)
+    if user_id is not None and db.is_enabled():
+        past_reports = db.get_user_reports(user_id)
+        report["comparison"] = compare_to_past_reports(report, past_reports)
+
+    candidate_name = ""
+    if current:
+        user = db.get_user_by_id(current["user_id"])
+        candidate_name = (user or {}).get("name") or (user or {}).get("email", "")
+
+    pdf_bytes = generate_report_pdf(report, candidate_name=candidate_name)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="interview_report_{session_id[:8]}.pdf"'},
     )
 
 
