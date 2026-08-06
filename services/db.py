@@ -183,6 +183,18 @@ def _create_schema(conn) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id)")
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)")
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token_hash TEXT NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL,
+            used_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ DEFAULT now()
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_password_resets_token_hash ON password_resets(token_hash)")
+
 
 def save_resume(session_id: str, raw_text: Optional[str], cleaned: Dict, user_id: Optional[int] = None) -> None:
     """Persist a parsed resume tied to a session_id (and a user, if logged in). Best-effort."""
@@ -333,3 +345,67 @@ def get_user_reports(user_id: int, limit: int = 20) -> List[Dict]:
     except Exception:
         logger.exception("db: get_user_reports failed for user %s", user_id)
         return []
+
+
+# ─── Password reset ──────────────────────────────────────────────────────────
+# Like create_user/get_user_by_email above (and unlike most of this module's
+# best-effort persistence), these raise on an unavailable DB rather than
+# silently no-op -- a password reset that appears to succeed but didn't
+# happen is a real problem, not a degraded experience.
+
+def create_password_reset(user_id: int, token_hash: str, expires_at) -> None:
+    """Store a hashed, expiring password reset token for a user."""
+    pool = _get_pool()
+    if pool is None:
+        raise RuntimeError("Persistent storage is not configured on this server.")
+    with pool.connection() as conn:
+        conn.execute(
+            "INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES (%s, %s, %s)",
+            (user_id, token_hash, expires_at),
+        )
+
+
+def get_password_reset_by_token_hash(token_hash: str) -> Optional[Dict]:
+    """
+    Returns the most recent {id, user_id, expires_at, used_at} row for this
+    token hash, or None if no such token was ever issued.
+
+    Looks up the most recent match rather than assuming uniqueness: token
+    hashes are effectively unique (2^256 space) but nothing in the schema
+    enforces it, and "most recent" is the correct choice if it somehow
+    weren't.
+    """
+    pool = _get_pool()
+    if pool is None:
+        raise RuntimeError("Persistent storage is not configured on this server.")
+    with pool.connection() as conn:
+        row = conn.execute(
+            "SELECT id, user_id, expires_at, used_at FROM password_resets "
+            "WHERE token_hash = %s ORDER BY created_at DESC LIMIT 1",
+            (token_hash,),
+        ).fetchone()
+        if not row:
+            return None
+        return {"id": row[0], "user_id": row[1], "expires_at": row[2], "used_at": row[3]}
+
+
+def mark_password_reset_used(reset_id: int) -> None:
+    """Mark a password reset token as consumed so it can't be reused."""
+    pool = _get_pool()
+    if pool is None:
+        raise RuntimeError("Persistent storage is not configured on this server.")
+    with pool.connection() as conn:
+        conn.execute(
+            "UPDATE password_resets SET used_at = now() WHERE id = %s", (reset_id,),
+        )
+
+
+def update_user_password(user_id: int, password_hash: str) -> None:
+    """Overwrite a user's stored password hash (used by the reset flow)."""
+    pool = _get_pool()
+    if pool is None:
+        raise RuntimeError("Persistent storage is not configured on this server.")
+    with pool.connection() as conn:
+        conn.execute(
+            "UPDATE users SET password_hash = %s WHERE id = %s", (password_hash, user_id),
+        )

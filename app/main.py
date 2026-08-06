@@ -93,7 +93,10 @@ app.add_middleware(
 # need a shared store, but that's beyond what "free hosting" implies here).
 RATE_LIMIT_WINDOW_S = int(os.getenv("RATE_LIMIT_WINDOW_S", "60"))
 RATE_LIMIT_MAX_REQUESTS = int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "20"))
-_RATE_LIMITED_PATHS = ("/next-question", "/evaluate-answer", "/session/", "/predict-questions")
+_RATE_LIMITED_PATHS = (
+    "/next-question", "/evaluate-answer", "/session/", "/predict-questions",
+    "/auth/forgot-password",
+)
 _request_log: dict = defaultdict(deque)
 
 

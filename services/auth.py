@@ -16,6 +16,7 @@ Design notes:
       invalid token must produce a clear 401, not a silent fallback.
 """
 
+import hashlib
 import logging
 import os
 import secrets
@@ -76,3 +77,32 @@ def decode_access_token(token: str) -> Optional[Dict]:
     except Exception:
         logger.exception("auth: unexpected error decoding token.")
         return None
+
+
+# ─── Password reset tokens ──────────────────────────────────────────────────
+# Unlike the JWT session token above, a reset token is a one-time, short-lived
+# secret that gets emailed in plaintext (in the reset link) and must remain
+# usable even if the JWT_SECRET_KEY rotates or the process restarts — so it's
+# a random high-entropy string, independently generated and stored (hashed)
+# in the password_resets table, not a JWT.
+PASSWORD_RESET_TOKEN_BYTES = 32
+PASSWORD_RESET_EXPIRY_MINUTES = int(os.getenv("PASSWORD_RESET_EXPIRY_MINUTES", "60"))
+
+
+def generate_reset_token() -> str:
+    """A random URL-safe token to email to the user — never stored raw."""
+    return secrets.token_urlsafe(PASSWORD_RESET_TOKEN_BYTES)
+
+
+def hash_reset_token(token: str) -> str:
+    """
+    SHA-256 of the token, for DB storage/lookup.
+
+    Deliberately NOT bcrypt: bcrypt's slow, salted hashing exists to defend
+    against brute-forcing a low-entropy human password. This token is already
+    a 32-byte random secret (2^256 possibilities) — a fast, unsalted
+    cryptographic hash is the standard, sufficient approach here, and lets
+    lookup be a plain indexed equality query instead of needing to check
+    every stored hash with bcrypt.checkpw.
+    """
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()

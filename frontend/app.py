@@ -516,6 +516,49 @@ def _call_history():
     return r.json()["reports"]
 
 
+def _call_forgot_password(email):
+    r = _http().post(f"{BACKEND_BASE}/auth/forgot-password", json={"email": email}, timeout=15)
+    r.raise_for_status()
+    return r.json()
+
+
+def _call_reset_password(token, new_password):
+    r = _http().post(
+        f"{BACKEND_BASE}/auth/reset-password",
+        json={"token": token, "new_password": new_password}, timeout=15,
+    )
+    r.raise_for_status()
+    return r.json()
+
+
+# ─── Password reset landing page ──────────────────────────────────────────
+# A reset email links back to this app with ?reset_token=... in the URL
+# (Streamlit has no server-side routing to give it a dedicated page). When
+# that param is present, show ONLY the "set new password" form and stop —
+# showing the full interview UI underneath a reset form would be confusing,
+# and st.stop() is the standard Streamlit way to short-circuit the rest of
+# the script for a given run.
+_reset_token = st.query_params.get("reset_token")
+if _reset_token:
+    st.markdown("## 🔑 Set a new password")
+    st.caption("This link is single-use and expires 1 hour after it was requested.")
+    new_pw = st.text_input("New password", type="password", key="reset_new_password")
+    confirm_pw = st.text_input("Confirm new password", type="password", key="reset_confirm_password")
+    if st.button("Update password", type="primary", key="reset_submit_btn"):
+        if not new_pw or len(new_pw) < 8:
+            st.warning("Password must be at least 8 characters.")
+        elif new_pw != confirm_pw:
+            st.warning("Passwords don't match.")
+        else:
+            try:
+                result = _call_reset_password(_reset_token, new_pw)
+                st.success(result.get("message", "Password updated — you can now log in."))
+                st.caption("You can close this tab, or clear the link from your address bar to return to the app.")
+            except Exception as e:
+                st.error(_friendly_http_error(e))
+    st.stop()
+
+
 # ─── Sidebar — persistent brand, status, and session controls ────────────────
 with st.sidebar:
     st.markdown(
@@ -589,6 +632,24 @@ with st.sidebar:
                         st.rerun()
                     except Exception as e:
                         st.error(_friendly_http_error(e))
+
+            if _auth_mode == "Log in":
+                with st.expander("Forgot password?"):
+                    _forgot_email = st.text_input("Email", key="forgot_password_email")
+                    if st.button("Send reset link", key="forgot_password_submit", use_container_width=True):
+                        if not _forgot_email or not _forgot_email.strip():
+                            st.warning("Enter your account email.")
+                        else:
+                            try:
+                                result = _call_forgot_password(_forgot_email.strip())
+                                st.success(result.get("message", "Check your email for a reset link."))
+                            except Exception as e:
+                                st.error(_friendly_http_error(e))
+                    st.caption(
+                        "If an account exists for that email, a reset link is sent to it — "
+                        "the link opens this app to set a new password."
+                    )
+
             st.caption(
                 "Optional — accounts let your interview history follow you across visits. "
                 "Everything works fine without one too."

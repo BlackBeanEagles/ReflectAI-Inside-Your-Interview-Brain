@@ -379,6 +379,45 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def _email_looks_valid(cls, v: str) -> str:
+        v = v.strip().lower()
+        if "@" not in v or "." not in v.split("@")[-1] or len(v) < 5:
+            raise ValueError("Enter a valid email address.")
+        return v
+
+
+class ForgotPasswordResponse(BaseModel):
+    """
+    Always returns the same generic message regardless of whether the email
+    exists — a different response for 'account not found' vs 'reset email
+    sent' would let an attacker enumerate registered emails. Whether the
+    email was ACTUALLY sent is intentionally not revealed here; check
+    server logs for the real outcome.
+    """
+    message: str = "If an account with that email exists, a password reset link has been sent."
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def _password_min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters.")
+        return v
+
+
+class ResetPasswordResponse(BaseModel):
+    message: str = "Password updated. You can now log in with your new password."
+
+
 class UserResponse(BaseModel):
     id: int
     email: str
