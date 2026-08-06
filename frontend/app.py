@@ -16,6 +16,7 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+import pandas as pd
 import requests
 import streamlit as st
 from requests.adapters import HTTPAdapter
@@ -588,8 +589,8 @@ with st.sidebar:
         )
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
-tab_interview, tab_resume, tab_ats = st.tabs(
-    ["🎯 Interview Session", "📄 Resume Analysis", "✅ ATS Score"]
+tab_interview, tab_resume, tab_ats, tab_history = st.tabs(
+    ["🎯 Interview Session", "📄 Resume Analysis", "✅ ATS Score", "📊 History"]
 )
 
 
@@ -1980,6 +1981,104 @@ with tab_ats:
                     f'</div>',
                     unsafe_allow_html=True,
                 )
+
+
+with tab_history:
+    st.markdown("### 📊 Interview History Dashboard")
+
+    if not st.session_state.get("auth_user"):
+        st.info(
+            "🔐 Log in from the sidebar to see score trends across your past sessions. "
+            "Anonymous use still works everywhere else — an account just lets your "
+            "history follow you across visits."
+        )
+    else:
+        st.caption(
+            f"Showing saved sessions for **{st.session_state['auth_user'].get('name') or st.session_state['auth_user']['email']}** "
+            "— only sessions you opted in to saving during setup appear here."
+        )
+        if st.button("🔄 Refresh history", key="dash_refresh"):
+            try:
+                st.session_state["auth_history"] = _call_history()
+            except Exception as e:
+                st.error(_friendly_http_error(e))
+
+        if st.session_state.get("auth_history") is None:
+            try:
+                st.session_state["auth_history"] = _call_history()
+            except Exception as e:
+                st.error(_friendly_http_error(e))
+
+        history = st.session_state.get("auth_history") or []
+
+        if not history:
+            st.info(
+                "No saved interviews yet. Tick **\"Save this session to my account\"** "
+                "(or the equivalent consent option) when starting an interview to build "
+                "history here."
+            )
+        else:
+            # API returns most-recent-first; chronological order reads more
+            # naturally for a trend line and for "session #1, #2, ...".
+            chronological = list(reversed(history))
+
+            rows = []
+            for i, item in enumerate(chronological, start=1):
+                rpt = item.get("report", {}) or {}
+                rows.append({
+                    "#": i,
+                    "Date": item.get("created_at", "")[:16].replace("T", " "),
+                    "Overall": rpt.get("overall_score"),
+                    "HR": rpt.get("hr_score"),
+                    "Technical": rpt.get("technical_score"),
+                    "Stress": rpt.get("stress_score"),
+                    "Questions": rpt.get("total_questions", 0),
+                    "session_id": item.get("session_id", ""),
+                })
+            df = pd.DataFrame(rows)
+
+            # ── Summary metrics ─────────────────────────────────────────────
+            overall_scores = df["Overall"].dropna()
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Sessions saved", len(df))
+            m2.metric("Average overall", f"{overall_scores.mean():.1f}" if len(overall_scores) else "N/A")
+            m3.metric("Best overall", f"{overall_scores.max():.1f}" if len(overall_scores) else "N/A")
+            if len(overall_scores) >= 2:
+                delta = overall_scores.iloc[-1] - overall_scores.iloc[-2]
+                m4.metric("Latest overall", f"{overall_scores.iloc[-1]:.1f}", delta=f"{delta:+.1f}")
+            else:
+                m4.metric("Latest overall", f"{overall_scores.iloc[-1]:.1f}" if len(overall_scores) else "N/A")
+
+            # ── Trend chart ──────────────────────────────────────────────────
+            st.markdown("**Score trend across your saved sessions**")
+            chart_df = df.set_index("#")[["Overall", "HR", "Technical", "Stress"]]
+            if chart_df.dropna(how="all").empty:
+                st.caption("Not enough scored sessions yet to plot a trend.")
+            else:
+                st.line_chart(chart_df)
+            st.caption(
+                "X-axis is session order (oldest → newest), not calendar time — "
+                "sessions can be days or minutes apart."
+            )
+
+            # ── Sessions table ──────────────────────────────────────────────
+            st.markdown("")
+            st.markdown("**All saved sessions**")
+            display_df = df.drop(columns=["session_id"]).sort_values("#", ascending=False)
+            st.dataframe(display_df, width="stretch", hide_index=True)
+
+            # ── Per-session detail (reuses the same report renderer as a
+            # live interview's final report) ─────────────────────────────
+            st.markdown("")
+            st.markdown("**Session details**")
+            for item in history:  # most-recent-first for the expander list
+                rpt = item.get("report", {}) or {}
+                overall = rpt.get("overall_score")
+                date_str = item.get("created_at", "")[:16].replace("T", " ")
+                overall_str = f"{overall:.1f}/10" if overall is not None else "N/A"
+                label = f"{date_str} — Overall {overall_str} · {rpt.get('total_questions', 0)} questions"
+                with st.expander(label):
+                    _render_report(rpt)
 
 
 # ─── Footer ──────────────────────────────────────────────────────────────────
