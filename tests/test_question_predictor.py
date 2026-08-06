@@ -59,12 +59,36 @@ def test_parse_predictions_caps_at_requested_count():
     assert len(result) == 3
 
 
-def test_parse_predictions_missing_tip_gets_fallback():
+def test_parse_predictions_blank_tip_gets_fallback_text():
     raw = "technical | A valid question here? |    \n"
     result = qp._parse_predictions(raw, count=1)
-    # The pattern requires a non-empty group for tip, so an all-whitespace
-    # tip won't even match -- this line should simply be skipped.
-    assert result == []
+    assert len(result) == 1
+    assert result[0]["question"] == "A valid question here?"
+    assert result[0]["prep_tip"] == qp._FALLBACK_TIP
+
+
+def test_parse_predictions_missing_tip_field_entirely_still_keeps_question():
+    """Real production behavior observed against Groq: the model sometimes
+    drops the third '| prep tip' field entirely even with plenty of token
+    budget left. A question shouldn't be discarded just because its bonus
+    tip is missing."""
+    raw = "hr | Can you tell us about a time you handled a difficult issue?\n"
+    result = qp._parse_predictions(raw, count=1)
+    assert len(result) == 1
+    assert result[0]["category"] == "hr"
+    assert result[0]["question"] == "Can you tell us about a time you handled a difficult issue?"
+    assert result[0]["prep_tip"] == qp._FALLBACK_TIP
+
+
+def test_parse_predictions_mixed_lines_with_and_without_tip():
+    raw = (
+        "technical | Explain how indexes speed up queries? | Mention B-trees.\n"
+        "hr | Why should we hire you?\n"
+    )
+    result = qp._parse_predictions(raw, count=5)
+    assert len(result) == 2
+    assert result[0]["prep_tip"] == "Mention B-trees."
+    assert result[1]["prep_tip"] == qp._FALLBACK_TIP
 
 
 def test_predict_questions_end_to_end_with_stubbed_llm(monkeypatch):

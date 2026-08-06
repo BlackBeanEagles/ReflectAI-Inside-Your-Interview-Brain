@@ -30,9 +30,17 @@ LLM_ERROR_PREFIXES = (
 _VALID_CATEGORIES = {"hr", "technical", "behavioral"}
 
 # Optional leading "1. " / "1) " numbering is tolerated and discarded — some
-# models add it despite being told not to.
-_LINE_PATTERN = re.compile(
+# models add it despite being told not to. The prep tip is a separate
+# optional pattern (see _parse_predictions) because the model sometimes
+# drops the third field even when it has plenty of token budget left —
+# a whole otherwise-valid question shouldn't be discarded just because the
+# bonus tip is missing.
+_LINE_PATTERN_WITH_TIP = re.compile(
     r"^\s*(?:\d+[.)]\s*)?(hr|technical|behavioral)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*$",
+    re.IGNORECASE,
+)
+_LINE_PATTERN_NO_TIP = re.compile(
+    r"^\s*(?:\d+[.)]\s*)?(hr|technical|behavioral)\s*\|\s*(.+?)\s*$",
     re.IGNORECASE,
 )
 
@@ -79,16 +87,43 @@ Rules — follow every rule strictly:
 Output only the {count} lines, nothing else:"""
 
 
+_FALLBACK_TIP = "Structure your answer with a specific example."
+
+
 def _parse_predictions(raw: str, count: int) -> List[Dict]:
     if not raw:
         return []
     results: List[Dict] = []
     seen = set()
-    for line in raw.strip().split("\n"):
-        m = _LINE_PATTERN.match(line.strip())
+    # Not raw.strip() -- stripping the whole string first collapses a
+    # trailing-whitespace-only tip field on the LAST line before per-line
+    # parsing ever sees it (see the rstrip("\r") comment below for why that
+    # distinction matters). Blank lines from raw.split("\n") simply fail
+    # to match either pattern below and are skipped, so this is safe.
+    for line in raw.split("\n"):
+        # Only strip the trailing \r a CRLF split can leave behind -- NOT
+        # all trailing whitespace. A line like "cat | question? |    " has
+        # an empty-but-present tip field; over-eager stripping collapses it
+        # to "cat | question? |" first, which then only matches the no-tip
+        # pattern with the dangling "|" wrongly absorbed into the question.
+        stripped = line.rstrip("\r")
+        category = question = tip = None
+
+        m = _LINE_PATTERN_WITH_TIP.match(stripped)
+        if m:
+            category, question, tip = m.groups()
+        else:
+            # The model sometimes drops the trailing "| prep tip" field
+            # entirely even with plenty of token budget left — a question
+            # is still worth keeping without its bonus tip.
+            m = _LINE_PATTERN_NO_TIP.match(stripped)
+            if m:
+                category, question = m.groups()
+                tip = ""
+
         if not m:
             continue
-        category, question, tip = m.groups()
+
         category = category.lower()
         question = question.strip().strip('"').strip("'")
         tip = tip.strip().strip('"').strip("'")
@@ -103,7 +138,7 @@ def _parse_predictions(raw: str, count: int) -> List[Dict]:
         results.append({
             "category": category,
             "question": question,
-            "prep_tip": tip or "Structure your answer with a specific example.",
+            "prep_tip": tip or _FALLBACK_TIP,
         })
         if len(results) >= count:
             break
@@ -137,7 +172,7 @@ def predict_questions(
         }
 
     prompt = _build_prompt(skills, projects, role, job_description, count)
-    raw = call_llm(prompt, purpose="question")
+    raw = call_llm(prompt, purpose="question_batch")
 
     if raw.startswith(LLM_ERROR_PREFIXES):
         logger.error("question_predictor: LLM error: %s", raw)

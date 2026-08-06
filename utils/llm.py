@@ -83,6 +83,16 @@ PROFILES: Dict[str, Dict] = {
         "top_p": 0.9,
         "stop": ["\n\n", "\nQuestion 2", "\n2."],
     },
+    # A batch of many questions in one call (predicted-questions prep list) —
+    # up to 20 lines of "category | question | prep tip", not one sentence.
+    # Sized generously (~60 tokens/line) rather than exactly, since running
+    # short truncates mid-line and silently drops the last question or two.
+    "question_batch": {
+        "num_predict": 1400,
+        "temperature": 0.8,
+        "top_k": 30,
+        "top_p": 0.9,
+    },
     # Structured rubric block: N score lines + 3 feedback sentences.
     "evaluation": {
         "num_predict": 260,
