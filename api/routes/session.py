@@ -27,7 +27,6 @@ from models.schemas import (
     AddInteractionRequest,
     SessionHistoryResponse,
     InteractionItem,
-    GenerateReportRequest,
     ReportResponse,
     ReplayCompareRequest,
     ReplayCompareResponse,

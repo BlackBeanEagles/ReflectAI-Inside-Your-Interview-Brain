@@ -231,12 +231,15 @@ def classify_thinking_style(
     Week 5 Day 4 — pattern-based style (not a single brittle if-else tree).
     Returns (style, confidence 0-1, supporting fingerprint subset).
     """
-    d, i, c, cons, conf = (
+    # Note: fingerprint["confidence"] is deliberately not unpacked here — it
+    # currently has no effect on any of the scoring rules below. Left out
+    # rather than bound to an unused variable, to avoid implying it's
+    # factored into the classification when it isn't.
+    d, i, c, cons = (
         fingerprint["analytical_depth"],
         fingerprint["impulsivity"],
         fingerprint["clarity"],
         fingerprint["consistency"],
-        fingerprint["confidence"],
     )
     bias_load = sum(bias_counter.values())
 

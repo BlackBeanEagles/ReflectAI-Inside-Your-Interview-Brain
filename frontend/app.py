@@ -417,6 +417,65 @@ def _status_info():
     return "ri-dot-ok", f"{health.get('model')} ready ({provider})", health
 
 
+def _friendly_http_error(e: Exception) -> str:
+    """
+    Turn a raise_for_status() HTTPError into wording a user can act on.
+
+    The backend now returns 429 (rate limit) and 413 (payload too large) in
+    normal operation on a public deployment, not just as edge-case failures —
+    the generic ``str(e)`` for those ("429 Client Error: ...") reads like a
+    crash rather than an expected, self-explanatory limit.
+
+    Defined here (before the sidebar, which needs it for login/signup error
+    display) rather than further down where the interview-tab helpers live —
+    Streamlit runs this file as a flat top-to-bottom script, so a function
+    used by the sidebar must be defined before the sidebar block runs, not
+    just somewhere in the file.
+    """
+    resp = getattr(e, "response", None)
+    if resp is not None:
+        if resp.status_code == 429:
+            return "You're sending requests a bit fast — please wait a few seconds and try again."
+        if resp.status_code == 413:
+            try:
+                return resp.json().get("detail", "That input is too large.")
+            except Exception:
+                return "That input is too large."
+        try:
+            detail = resp.json().get("detail")
+            if detail:
+                return str(detail)
+        except Exception:
+            pass
+    return f"Error: {e}"
+
+
+def _auth_headers():
+    """Authorization header for the logged-in user, or {} if not logged in."""
+    token = st.session_state.get("auth_token")
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
+def _call_signup(email, password, name=None):
+    r = _http().post(f"{BACKEND_BASE}/auth/signup",
+                     json={"email": email, "password": password, "name": name}, timeout=15)
+    r.raise_for_status()
+    return r.json()
+
+
+def _call_login(email, password):
+    r = _http().post(f"{BACKEND_BASE}/auth/login",
+                     json={"email": email, "password": password}, timeout=15)
+    r.raise_for_status()
+    return r.json()
+
+
+def _call_history():
+    r = _http().get(f"{BACKEND_BASE}/auth/history", headers=_auth_headers(), timeout=15)
+    r.raise_for_status()
+    return r.json()["reports"]
+
+
 # ─── Sidebar — persistent brand, status, and session controls ────────────────
 with st.sidebar:
     st.markdown(
@@ -664,33 +723,6 @@ def _take_prefetch(state, cleaned, session_id):
         return None
 
 
-def _friendly_http_error(e: Exception) -> str:
-    """
-    Turn a raise_for_status() HTTPError into wording a user can act on.
-
-    The backend now returns 429 (rate limit) and 413 (payload too large) in
-    normal operation on a public deployment, not just as edge-case failures —
-    the generic ``str(e)`` for those ("429 Client Error: ...") reads like a
-    crash rather than an expected, self-explanatory limit.
-    """
-    resp = getattr(e, "response", None)
-    if resp is not None:
-        if resp.status_code == 429:
-            return "You're sending requests a bit fast — please wait a few seconds and try again."
-        if resp.status_code == 413:
-            try:
-                return resp.json().get("detail", "That input is too large.")
-            except Exception:
-                return "That input is too large."
-        try:
-            detail = resp.json().get("detail")
-            if detail:
-                return str(detail)
-        except Exception:
-            pass
-    return f"Error: {e}"
-
-
 def _call_evaluate(question, answer, answer_type, coaching_hint=None):
     payload = {"question": question, "answer": answer, "answer_type": answer_type}
     if coaching_hint and str(coaching_hint).strip():
@@ -745,12 +777,6 @@ def _speak_text_button(text: str, key: str, label: str = "🔊 Listen to the que
     )
 
 
-def _auth_headers():
-    """Authorization header for the logged-in user, or {} if not logged in."""
-    token = st.session_state.get("auth_token")
-    return {"Authorization": f"Bearer {token}"} if token else {}
-
-
 def _call_session_start(store_consent=False):
     r = _http().post(
         f"{BACKEND_BASE}/session/start",
@@ -760,26 +786,6 @@ def _call_session_start(store_consent=False):
     )
     r.raise_for_status()
     return r.json()["session_id"]
-
-
-def _call_signup(email, password, name=None):
-    r = _http().post(f"{BACKEND_BASE}/auth/signup",
-                     json={"email": email, "password": password, "name": name}, timeout=15)
-    r.raise_for_status()
-    return r.json()
-
-
-def _call_login(email, password):
-    r = _http().post(f"{BACKEND_BASE}/auth/login",
-                     json={"email": email, "password": password}, timeout=15)
-    r.raise_for_status()
-    return r.json()
-
-
-def _call_history():
-    r = _http().get(f"{BACKEND_BASE}/auth/history", headers=_auth_headers(), timeout=15)
-    r.raise_for_status()
-    return r.json()["reports"]
 
 
 def _call_add_interaction(
@@ -1324,7 +1330,7 @@ with tab_interview:
                                     st.session_state["iv_stored_count"] += 1
                                     st.session_state["iv_score_history"].append(eval_result["final_score"])
                                     st.session_state["iv_report_done"] = False
-                                except Exception as e:
+                                except Exception:
                                     # Session save is best-effort — don't block the user
                                     pass
 
