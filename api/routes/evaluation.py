@@ -16,6 +16,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from models.schemas import EvaluateRequest, EvaluateResponse, FeedbackDetail, TranscribeResponse
 from services import speech
 from services.evaluator import evaluate_answer
+from services.voice_analysis import analyze_voice_answer
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -81,11 +82,25 @@ async def transcribe_audio_endpoint(file: UploadFile = File(...)):
             detail=f"Recording too large. Max is {speech.MAX_AUDIO_MB:.0f}MB.",
         )
 
-    text = speech.transcribe_audio(audio_bytes, filename=file.filename or "answer.wav")
-    is_error = text.startswith(speech.TRANSCRIBE_ERROR_PREFIX)
+    result = speech.transcribe_audio_detailed(audio_bytes, filename=file.filename or "answer.wav")
+    text = result.get("text", "")
+    is_error = result.get("is_error", False)
+
+    voice_analysis = None
+    if not is_error:
+        try:
+            voice_analysis = analyze_voice_answer(
+                text=text,
+                duration_seconds=result.get("duration_seconds"),
+                words=result.get("words"),
+            )
+        except Exception:
+            # Analysis is a bonus on top of the transcript, never a reason
+            # to fail the whole request -- the user still gets their text.
+            logger.exception("transcribe-audio: voice analysis failed — omitting it.")
 
     logger.info(
-        "transcribe-audio: name='%s', size=%d bytes, error=%s",
-        file.filename, len(audio_bytes), is_error,
+        "transcribe-audio: name='%s', size=%d bytes, error=%s, has_voice_analysis=%s",
+        file.filename, len(audio_bytes), is_error, voice_analysis is not None,
     )
-    return TranscribeResponse(text=text, is_error=is_error)
+    return TranscribeResponse(text=text, is_error=is_error, voice_analysis=voice_analysis)

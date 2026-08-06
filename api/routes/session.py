@@ -92,6 +92,7 @@ def add_interaction(request: AddInteractionRequest):
             "improvement": request.feedback.improvement,
         },
         response_time_seconds=request.response_time_seconds,
+        voice_analysis=request.voice_analysis,
     )
     if session_manager.has_store_consent(request.session_id):
         db.save_interaction(request.session_id, interaction,
@@ -206,6 +207,7 @@ def generate_final_report(session_id: str):
         behavior_summary      = report.get("behavior_summary", "") or "",
         cognitive             = report.get("cognitive"),
         comparison            = report.get("comparison"),
+        voice_insights        = report.get("voice_insights"),
     )
 
 

@@ -317,6 +317,10 @@ class TranscribeResponse(BaseModel):
     """Output schema for /transcribe-audio — voice input for interview answers."""
     text: str
     is_error: bool = False
+    # Filler-word/pace/confidence analysis of this specific recording — see
+    # services/voice_analysis.py. None when transcription failed, or when
+    # analysis itself failed (never blocks returning the transcript).
+    voice_analysis: Optional[Dict[str, Any]] = None
 
 
 # ─── User Authentication ──────────────────────────────────────────────────────
@@ -400,6 +404,9 @@ class AddInteractionRequest(BaseModel):
     final_score: float
     feedback:    FeedbackDetail
     response_time_seconds: Optional[float] = None
+    # Present only when this answer was recorded by voice — see
+    # services/voice_analysis.py. Typed answers simply omit this.
+    voice_analysis: Optional[Dict[str, Any]] = None
 
     @field_validator("round_type")
     @classmethod
@@ -423,6 +430,7 @@ class InteractionItem(BaseModel):
     feedback:    Dict[str, str]
     timestamp:   str
     response_time_seconds: Optional[float] = None
+    voice_analysis: Optional[Dict[str, Any]] = None
 
 
 class SessionHistoryResponse(BaseModel):
@@ -479,6 +487,11 @@ class ReportResponse(BaseModel):
     # report — a real comparison against their own history, never a
     # fabricated population statistic. See services/history_analytics.py.
     comparison: Optional[Dict[str, Any]] = None
+    # Only populated when at least one answer in the session was recorded
+    # by voice — aggregated filler-word/pace/confidence signals across
+    # those answers. None (not zeros) for a session answered entirely by
+    # typing. See services/voice_analysis.py.
+    voice_insights: Optional[Dict[str, Any]] = None
 
 
 # ─── Week 5 Day 5 — Counterfactual replay ────────────────────────────────────

@@ -87,6 +87,42 @@ def test_comparison_section_renders_without_crashing():
     assert _is_valid_pdf(pdf_bytes)
 
 
+def test_voice_insights_section_renders_without_crashing():
+    report = dict(FULL_REPORT)
+    report["voice_insights"] = {
+        "voiced_answer_count": 3,
+        "avg_filler_ratio": 0.065,
+        "total_filler_words": 7,
+        "avg_words_per_minute": 142.3,
+        "avg_confidence_score": 7.2,
+        "total_hesitation_pauses": 4,
+        "recurring_signals": [
+            "Some filler-word usage (7% of words)",
+            "2 hesitation pause(s) over 1.2s",
+        ],
+    }
+    pdf_bytes = generate_report_pdf(report)
+    assert _is_valid_pdf(pdf_bytes)
+    assert len(pdf_bytes) > 1000
+
+
+def test_voice_insights_section_handles_missing_optional_fields():
+    """pace/pauses can each independently be None (no duration / no word
+    timestamps) -- the PDF section must not assume every key is present."""
+    report = dict(FULL_REPORT)
+    report["voice_insights"] = {
+        "voiced_answer_count": 1,
+        "avg_filler_ratio": 0.0,
+        "total_filler_words": 0,
+        "avg_words_per_minute": None,
+        "avg_confidence_score": None,
+        "total_hesitation_pauses": None,
+        "recurring_signals": [],
+    }
+    pdf_bytes = generate_report_pdf(report)
+    assert _is_valid_pdf(pdf_bytes)
+
+
 def test_pdf_safe_replaces_common_unicode_punctuation():
     assert _pdf_safe("a—b") == "a-b"
     assert _pdf_safe("‘quoted’") == "'quoted'"

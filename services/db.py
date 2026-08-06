@@ -153,9 +153,13 @@ def _create_schema(conn) -> None:
             final_score REAL,
             feedback JSONB,
             response_time_seconds REAL,
+            voice_analysis JSONB,
             created_at TIMESTAMPTZ DEFAULT now()
         )
     """)
+    # Existing databases created before voice_analysis existed won't have
+    # the column -- add it defensively, same pattern as user_id below.
+    conn.execute("ALTER TABLE interactions ADD COLUMN IF NOT EXISTS voice_analysis JSONB")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS reports (
             id SERIAL PRIMARY KEY,
@@ -216,8 +220,8 @@ def save_interaction(session_id: str, interaction: Dict, user_id: Optional[int] 
                 """
                 INSERT INTO interactions
                     (session_id, user_id, question, answer, round_type, scores, final_score,
-                     feedback, response_time_seconds)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     feedback, response_time_seconds, voice_analysis)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     session_id,
@@ -229,6 +233,7 @@ def save_interaction(session_id: str, interaction: Dict, user_id: Optional[int] 
                     interaction.get("final_score"),
                     json.dumps(interaction.get("feedback", {})),
                     interaction.get("response_time_seconds"),
+                    json.dumps(interaction["voice_analysis"]) if interaction.get("voice_analysis") else None,
                 ),
             )
     except Exception:

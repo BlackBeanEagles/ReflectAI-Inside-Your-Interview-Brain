@@ -166,6 +166,32 @@ def generate_report_pdf(report: Dict, candidate_name: str = "") -> bytes:
                     f"prior session(s) ({sign}{data['delta']:.1f})"
                 )
 
+        voice = report.get("voice_insights")
+        if voice:
+            pdf.section_title("Voice & Delivery")
+            n = voice["voiced_answer_count"]
+            pdf.body_text(f"Based on {n} voice-recorded answer{'s' if n != 1 else ''} in this session.")
+            if voice.get("avg_words_per_minute") is not None:
+                pdf.plain_line(f"Average pace: {voice['avg_words_per_minute']:.0f} words/minute")
+            pdf.plain_line(
+                f"Filler words: {voice['total_filler_words']} total "
+                f"({voice['avg_filler_ratio']:.0%} of words on average)"
+            )
+            if voice.get("total_hesitation_pauses") is not None:
+                pdf.plain_line(f"Hesitation pauses: {voice['total_hesitation_pauses']} total")
+            if voice.get("avg_confidence_score") is not None:
+                pdf.plain_line(f"Average confidence heuristic: {voice['avg_confidence_score']:.1f}/10")
+            if voice.get("recurring_signals"):
+                pdf.plain_line("Recurring patterns:")
+                pdf.bullet_list(voice["recurring_signals"])
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.set_text_color(*_MUTED)
+            pdf.body_text(
+                "Confidence is a heuristic from filler words, pace, and pauses -- "
+                "not a validated psychological measurement."
+            )
+            pdf.set_text_color(*_DARK)
+
         return bytes(pdf.output())
     except Exception:
         logger.exception("pdf_report: failed to render report PDF — returning fallback page.")

@@ -274,6 +274,54 @@ def _behavioral_analysis(history: List[Dict], aggregates: Dict) -> Dict:
     }
 
 
+# ── Voice insights (filler-word/pace/confidence) ────────────────────────────────
+
+def _voice_insights(history: List[Dict]) -> Optional[Dict]:
+    """
+    Aggregate per-answer voice_analysis blocks (see services/voice_analysis.py)
+    across the session. Returns None — not zeros — when no answer in this
+    session was recorded by voice, so a typed-only session's report never
+    shows fabricated delivery stats.
+    """
+    voiced = [h for h in history if h.get("voice_analysis")]
+    if not voiced:
+        return None
+
+    filler_ratios = [h["voice_analysis"]["filler_words"]["filler_ratio"] for h in voiced]
+    total_fillers = sum(h["voice_analysis"]["filler_words"]["filler_count"] for h in voiced)
+
+    paces = [h["voice_analysis"]["pace"] for h in voiced if h["voice_analysis"].get("pace")]
+    avg_wpm = _avg([p["words_per_minute"] for p in paces]) if paces else None
+
+    confidences = [h["voice_analysis"]["confidence"]["confidence_score"] for h in voiced]
+    avg_confidence = _avg(confidences)
+
+    pause_totals = [
+        h["voice_analysis"]["pauses"]["pause_count"]
+        for h in voiced if h["voice_analysis"].get("pauses") is not None
+    ]
+    total_pauses = sum(pause_totals) if pause_totals else None
+
+    # Every distinct signal that contributed a deduction anywhere in the
+    # session, most-frequent first -- so the report can say what to work on
+    # without hiding behind a single averaged number.
+    signal_counts: Counter = Counter()
+    for h in voiced:
+        for signal in h["voice_analysis"]["confidence"]["signals"]:
+            if not signal.startswith("No filler words"):
+                signal_counts[signal] += 1
+
+    return {
+        "voiced_answer_count": len(voiced),
+        "avg_filler_ratio": round(sum(filler_ratios) / len(filler_ratios), 3),
+        "total_filler_words": total_fillers,
+        "avg_words_per_minute": avg_wpm,
+        "avg_confidence_score": avg_confidence,
+        "total_hesitation_pauses": total_pauses,
+        "recurring_signals": [s for s, _ in signal_counts.most_common(5)],
+    }
+
+
 # ── Pattern detection ──────────────────────────────────────────────────────────
 
 def _detect_patterns(history: List[Dict]) -> Dict:
@@ -493,6 +541,7 @@ def generate_report(history: List[Dict]) -> Dict:
             "behavior_tags": [],
             "behavior_summary": "No behavioural analysis possible without evaluated answers.",
             "cognitive": None,
+            "voice_insights": None,
         }
 
     # ── Build report ──────────────────────────────────────────────────────
@@ -504,6 +553,7 @@ def generate_report(history: List[Dict]) -> Dict:
     combined: Dict = {
         **scores,
         "total_questions": n,
+        "voice_insights": _voice_insights(history),
         **analysis,
         **behavior,
     }

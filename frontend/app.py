@@ -740,7 +740,31 @@ def _call_transcribe(audio_bytes, filename="answer.wav"):
         timeout=45,
     )
     r.raise_for_status()
-    return r.json()  # {"text": ..., "is_error": bool}
+    return r.json()  # {"text": ..., "is_error": bool, "voice_analysis": dict|None}
+
+
+def _render_voice_analysis_inline(analysis: dict):
+    """Compact one-line-per-signal readout shown right after a recording is
+    transcribed — reflects that specific recording, not the edited text
+    below it if the user changes their answer afterward."""
+    if not analysis:
+        return
+    filler = analysis.get("filler_words", {})
+    pace = analysis.get("pace")
+    pauses = analysis.get("pauses")
+    confidence = analysis.get("confidence", {})
+
+    parts = [f"🗯️ {filler.get('filler_count', 0)} filler word(s) ({filler.get('filler_ratio', 0):.0%})"]
+    if pace:
+        parts.append(f"⏱️ {pace['words_per_minute']:.0f} wpm ({pace['pace_label']})")
+    if pauses is not None:
+        parts.append(f"⏸️ {pauses['pause_count']} pause(s)")
+    if confidence:
+        parts.append(f"🎯 Confidence heuristic: {confidence['confidence_score']:.1f}/10")
+
+    st.caption(" · ".join(parts) + " — based on your recording, not later edits to the text.")
+    if confidence.get("signals"):
+        st.caption("　" + "; ".join(confidence["signals"]))
 
 
 def _speak_text_button(text: str, key: str, label: str = "🔊 Listen to the question"):
@@ -796,6 +820,7 @@ def _call_add_interaction(
     round_type,
     eval_result,
     response_time_seconds=None,
+    voice_analysis=None,
 ):
     payload = {
         "session_id":  session_id,
@@ -808,6 +833,8 @@ def _call_add_interaction(
     }
     if response_time_seconds is not None and response_time_seconds >= 0:
         payload["response_time_seconds"] = float(response_time_seconds)
+    if voice_analysis is not None:
+        payload["voice_analysis"] = voice_analysis
     r = _http().post(f"{BACKEND_BASE}/session/add-interaction", json=payload, timeout=10)
     r.raise_for_status()
     return r.json()
@@ -977,6 +1004,34 @@ def _render_report(report: dict):
                 )
         st.caption(
             "Based on your own prior saved sessions — not a comparison to other candidates."
+        )
+        st.markdown("")
+
+    # ── Voice & delivery (only if at least one answer was recorded) ────────
+    voice = report.get("voice_insights")
+    if voice:
+        st.markdown(
+            '<div class="report-section-title">🎙️ Voice & Delivery</div>',
+            unsafe_allow_html=True,
+        )
+        vn = voice["voiced_answer_count"]
+        st.caption(f"Based on {vn} voice-recorded answer{'s' if vn != 1 else ''} in this session.")
+        v1, v2, v3, v4 = st.columns(4)
+        v1.metric("Filler words", voice["total_filler_words"],
+                   help=f"{voice['avg_filler_ratio']:.0%} of words on average")
+        v2.metric("Avg. pace",
+                   f"{voice['avg_words_per_minute']:.0f} wpm" if voice.get("avg_words_per_minute") is not None else "N/A")
+        v3.metric("Hesitation pauses",
+                   voice["total_hesitation_pauses"] if voice.get("total_hesitation_pauses") is not None else "N/A")
+        v4.metric("Confidence heuristic",
+                   f"{voice['avg_confidence_score']:.1f}/10" if voice.get("avg_confidence_score") is not None else "N/A")
+        if voice.get("recurring_signals"):
+            st.markdown("**Recurring patterns**")
+            for s in voice["recurring_signals"]:
+                st.markdown(f'<div class="report-item report-pattern">{s}</div>', unsafe_allow_html=True)
+        st.caption(
+            "Confidence is a heuristic from filler words, pace, and pauses in your recordings — "
+            "not a validated psychological measurement."
         )
         st.markdown("")
 
@@ -1293,11 +1348,14 @@ with tab_interview:
                                     st.error(result["text"])
                                 else:
                                     st.session_state[f"iv_answer_{count}"] = result["text"]
+                                    st.session_state[f"iv_voice_analysis_{count}"] = result.get("voice_analysis")
                                     st.rerun()
                             except requests.exceptions.ConnectionError:
                                 st.error("Cannot connect to backend.")
                             except Exception as e:
                                 st.error(_friendly_http_error(e))
+
+            _render_voice_analysis_inline(st.session_state.get(f"iv_voice_analysis_{count}"))
 
             # ── Answer input ──────────────────────────────────────────────
             st.markdown("")
@@ -1359,6 +1417,7 @@ with tab_interview:
                                         round_type=cur_round,
                                         eval_result=eval_result,
                                         response_time_seconds=resp_secs,
+                                        voice_analysis=st.session_state.get(f"iv_voice_analysis_{count}"),
                                     )
                                     st.session_state["iv_stored_count"] += 1
                                     st.session_state["iv_score_history"].append(eval_result["final_score"])

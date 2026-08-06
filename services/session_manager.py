@@ -170,6 +170,7 @@ def add_interaction(
     final_score: float,
     feedback: Dict[str, str],
     response_time_seconds: Optional[float] = None,
+    voice_analysis: Optional[Dict] = None,
 ) -> Dict:
     """
     Store one evaluated interaction into the session.
@@ -185,6 +186,8 @@ def add_interaction(
         final_score: Average score from the evaluator.
         feedback:    Dict with keys strength / weakness / improvement.
         response_time_seconds: Optional wall time to answer (Week 5 Day 2).
+        voice_analysis: Present only if this answer was recorded by voice —
+            filler-word/pace/confidence signals from services/voice_analysis.py.
 
     Returns:
         The stored interaction dict (including timestamp).
@@ -200,6 +203,8 @@ def add_interaction(
     }
     if response_time_seconds is not None:
         interaction["response_time_seconds"] = float(response_time_seconds)
+    if voice_analysis is not None:
+        interaction["voice_analysis"] = voice_analysis
 
     with _lock:
         if session_id not in _sessions:
