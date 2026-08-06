@@ -199,6 +199,15 @@ def next_question_endpoint(request: NextQuestionRequest):
 
     sid = (request.session_id or "").strip() or None
 
+    # language is session-scoped (set once at /session/start, same pattern as
+    # store_consent) -- fall back to the session's stored value so a caller
+    # that only sends session_id (and not language on every single call)
+    # still gets a consistent language for the whole interview, instead of
+    # silently reverting to English. An explicit request.language always wins.
+    language = (request.language or "").strip() or None
+    if not language and sid:
+        language = session_manager.get_session_language(sid)
+
     result = run_interview_step(
         question_count=request.count,
         cleaned_data=cleaned_data,
@@ -210,7 +219,7 @@ def next_question_endpoint(request: NextQuestionRequest):
         max_questions=request.max_questions,
         session_id=sid,
         role=(request.role or "").strip() or None,
-        language=(request.language or "").strip() or None,
+        language=language,
     )
 
     return NextQuestionResponse(

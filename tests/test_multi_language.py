@@ -164,6 +164,59 @@ def test_next_question_accepts_language_field():
     assert r.status_code == 200
 
 
+def test_next_question_falls_back_to_session_language_when_not_passed(monkeypatch):
+    """Regression: found live in production -- language is set once at
+    /session/start (session-scoped, like store_consent), so a /next-question
+    call that only sends session_id (not language on every single call) must
+    still use the session's stored language rather than silently reverting
+    to English."""
+    import api.routes.resume as resume_route
+
+    captured = {}
+    original = resume_route.run_interview_step
+
+    def spy(*args, **kwargs):
+        captured["language"] = kwargs.get("language")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(resume_route, "run_interview_step", spy)
+
+    client = _client()
+    r0 = client.post("/session/start", json={"language": "Spanish"})
+    sid = r0.json()["session_id"]
+
+    r = client.post("/next-question", json={
+        "count": 0, "skills": ["Python"], "current_round": "hr", "session_id": sid,
+        # deliberately NOT passing "language" here
+    })
+    assert r.status_code == 200
+    assert captured["language"] == "Spanish"
+
+
+def test_next_question_explicit_language_overrides_session_language(monkeypatch):
+    import api.routes.resume as resume_route
+
+    captured = {}
+    original = resume_route.run_interview_step
+
+    def spy(*args, **kwargs):
+        captured["language"] = kwargs.get("language")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(resume_route, "run_interview_step", spy)
+
+    client = _client()
+    r0 = client.post("/session/start", json={"language": "Spanish"})
+    sid = r0.json()["session_id"]
+
+    r = client.post("/next-question", json={
+        "count": 0, "skills": ["Python"], "current_round": "hr",
+        "session_id": sid, "language": "French",
+    })
+    assert r.status_code == 200
+    assert captured["language"] == "French"
+
+
 def test_evaluate_answer_accepts_language_field():
     client = _client()
     payload = {
