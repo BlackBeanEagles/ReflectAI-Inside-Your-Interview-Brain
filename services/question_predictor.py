@@ -73,12 +73,11 @@ candidate's actual skills/projects (and the target role/job description if given
 but include some HR and behavioral questions too.
 
 Output EXACTLY {count} lines, one question per line, in this exact format:
-category | question | one-sentence prep tip
+category | question
 
 Rules — follow every rule strictly:
 - category must be exactly one of: hr, technical, behavioral (lowercase)
 - question must end with a question mark
-- prep tip is ONE sentence of concrete advice on what a strong answer should cover
 - Do not number the lines, do not add headers or a preamble, do not add any text
   before or after the {count} lines
 - Do not repeat the same question twice
@@ -87,7 +86,20 @@ Rules — follow every rule strictly:
 Output only the {count} lines, nothing else:"""
 
 
-_FALLBACK_TIP = "Structure your answer with a specific example."
+# The prompt only asks for "category | question" now -- an 8B model proved
+# unreliable at also including a bespoke third field for every one of up to
+# 20 lines (observed live in production: it either dropped the field
+# entirely or got truncated before reaching it). Rather than show the same
+# single generic sentence under every question regardless of category, these
+# deterministic, category-specific tips are always genuinely relevant advice
+# -- not a guess, and not fake specificity pretending to be per-question.
+# _LINE_PATTERN_WITH_TIP is kept as a bonus path: if the model does include
+# a good custom tip anyway, it's used instead of the category default.
+_CATEGORY_TIPS = {
+    "hr": "Be specific and honest, and tie your answer back to this role and company.",
+    "technical": "Explain your reasoning and trade-offs, and ground your answer in a specific project you've built.",
+    "behavioral": "Use the STAR method: Situation, Task, Action, Result.",
+}
 
 
 def _parse_predictions(raw: str, count: int) -> List[Dict]:
@@ -138,7 +150,7 @@ def _parse_predictions(raw: str, count: int) -> List[Dict]:
         results.append({
             "category": category,
             "question": question,
-            "prep_tip": tip or _FALLBACK_TIP,
+            "prep_tip": tip or _CATEGORY_TIPS[category],
         })
         if len(results) >= count:
             break
