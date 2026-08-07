@@ -49,11 +49,18 @@ def test_ignores_none_values_within_past_reports_when_averaging():
     assert result["stress_score"]["past_average"] == 4.0
 
 
-def test_returns_none_when_no_comparable_fields_overlap():
+def test_returns_none_when_current_report_is_empty():
+    past = [_past(6.0)]
+    result = compare_to_past_reports({}, past)
+    assert result is None
+
+
+def test_returns_none_when_current_field_is_explicitly_none():
+    """A field present but explicitly None (vs. simply absent) must be
+    treated the same way -- skipped, not compared."""
     current = {"overall_score": None}
     past = [_past(6.0)]
-    # current_report has no usable fields at all
-    result = compare_to_past_reports({}, past)
+    result = compare_to_past_reports(current, past)
     assert result is None
 
 

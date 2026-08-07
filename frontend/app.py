@@ -580,16 +580,22 @@ with st.sidebar:
 
     if st.session_state.get("auth_user"):
         st.divider()
-        st.markdown(f"👤 **{st.session_state['auth_user'].get('name') or st.session_state['auth_user']['email']}**")
-        st.caption(st.session_state["auth_user"]["email"])
-        if st.button("Log out", use_container_width=True, key="sidebar_logout"):
+        _auth_user_name = st.session_state["auth_user"].get("name")
+        _auth_user_email = st.session_state["auth_user"]["email"]
+        st.markdown(f"👤 **{_auth_user_name or _auth_user_email}**")
+        # Only show the email as a second line when it's not already the
+        # headline above -- a user with no name would otherwise see their
+        # own email printed twice in a row.
+        if _auth_user_name:
+            st.caption(_auth_user_email)
+        if st.button("Log out", width="stretch", key="sidebar_logout"):
             st.session_state["auth_token"] = None
             st.session_state["auth_user"] = None
             st.session_state["auth_history"] = None
             st.rerun()
 
         with st.expander("📜 My past interviews"):
-            if st.button("Refresh", key="history_refresh", use_container_width=True):
+            if st.button("Refresh", key="history_refresh", width="stretch"):
                 try:
                     st.session_state["auth_history"] = _call_history()
                 except Exception as e:
@@ -610,7 +616,7 @@ with st.sidebar:
     else:
         st.divider()
         with st.expander("🔐 Log in / Sign up"):
-            _auth_mode = st.radio("", ["Log in", "Sign up"], horizontal=True,
+            _auth_mode = st.radio("Log in or sign up", ["Log in", "Sign up"], horizontal=True,
                                    key="auth_mode", label_visibility="collapsed")
             _auth_email = st.text_input("Email", key="auth_email_input")
             _auth_password = st.text_input("Password", type="password", key="auth_password_input")
@@ -618,7 +624,7 @@ with st.sidebar:
             if _auth_mode == "Sign up":
                 _auth_name = st.text_input("Name (optional)", key="auth_name_input")
 
-            if st.button(_auth_mode, type="primary", use_container_width=True, key="auth_submit"):
+            if st.button(_auth_mode, type="primary", width="stretch", key="auth_submit"):
                 if not _auth_email or not _auth_password:
                     st.warning("Enter an email and password.")
                 else:
@@ -636,7 +642,7 @@ with st.sidebar:
             if _auth_mode == "Log in":
                 with st.expander("Forgot password?"):
                     _forgot_email = st.text_input("Email", key="forgot_password_email")
-                    if st.button("Send reset link", key="forgot_password_submit", use_container_width=True):
+                    if st.button("Send reset link", key="forgot_password_submit", width="stretch"):
                         if not _forgot_email or not _forgot_email.strip():
                             st.warning("Enter your account email.")
                         else:
@@ -687,7 +693,7 @@ with st.sidebar:
         if skills_preview:
             st.caption(f"🛠️ {skills_preview}")
         st.markdown("")
-        if st.button("↩ Reset interview", use_container_width=True, key="sidebar_reset"):
+        if st.button("↩ Reset interview", width="stretch", key="sidebar_reset"):
             for k in list(IV_DEFAULTS.keys()):
                 st.session_state[k] = IV_DEFAULTS[k]
             st.rerun()
@@ -1412,7 +1418,7 @@ with tab_interview:
                 key="iv_store_consent",
             )
 
-        if st.button("🚀  Start Interview", type="primary", use_container_width=True, key="iv_start"):
+        if st.button("🚀  Start Interview", type="primary", width="stretch", key="iv_start"):
             has_input = (resume_text and resume_text.strip()) or resume_file
             if not has_input:
                 st.warning("Please paste your resume or upload a PDF first.")
@@ -1524,7 +1530,7 @@ with tab_interview:
                 iv_audio = st.audio_input("Record your answer", key=f"iv_audio_{count}")
                 if iv_audio is not None:
                     if st.button("📝 Transcribe recording into the answer box",
-                                  key=f"iv_transcribe_btn_{count}", use_container_width=True):
+                                  key=f"iv_transcribe_btn_{count}", width="stretch"):
                         with st.spinner("Transcribing..."):
                             try:
                                 result = _call_transcribe(iv_audio.getvalue())
@@ -1556,14 +1562,14 @@ with tab_interview:
                 eval_clicked = st.button(
                     "🧠  Evaluate My Answer",
                     type="primary",
-                    use_container_width=True,
+                    width="stretch",
                     key=f"iv_eval_btn_{count}",
                     disabled=st.session_state["iv_evaluated"],
                 )
             with col_skip:
                 skip_clicked = st.button(
                     "Skip →",
-                    use_container_width=True,
+                    width="stretch",
                     key=f"iv_skip_{count}",
                 )
 
@@ -1671,7 +1677,7 @@ with tab_interview:
         next_clicked = st.button(
             btn_label,
             type="secondary" if st.session_state["iv_current_q"] else "primary",
-            use_container_width=True,
+            width="stretch",
             key="iv_next",
             disabled=st.session_state.get("iv_interview_complete", False),
         )
@@ -1811,7 +1817,7 @@ with tab_interview:
                 if st.button(
                     "📋  Generate Final Report",
                     type="primary",
-                    use_container_width=True,
+                    width="stretch",
                     key="iv_gen_report",
                     disabled=st.session_state["iv_report_done"],
                 ):
@@ -1846,13 +1852,13 @@ with tab_interview:
                             data=pdf_bytes,
                             file_name=f"interview_report_{session_id[:8]}.pdf",
                             mime="application/pdf",
-                            use_container_width=True,
+                            width="stretch",
                             key="iv_report_pdf_dl",
                         )
                     except Exception:
                         st.caption("PDF download unavailable right now.")
                 with regen_col:
-                    if st.button("🔄  Regenerate Report", key="iv_regen_report", use_container_width=True):
+                    if st.button("🔄  Regenerate Report", key="iv_regen_report", width="stretch"):
                         st.session_state["iv_report_done"] = False
                         st.session_state["iv_report"]      = None
                         st.rerun()
@@ -1898,9 +1904,9 @@ with tab_resume:
 
     col_p, col_clr = st.columns([3, 1])
     with col_p:
-        parse_btn = st.button("🔍  Parse Resume", type="primary", use_container_width=True, key="ra_parse")
+        parse_btn = st.button("🔍  Parse Resume", type="primary", width="stretch", key="ra_parse")
     with col_clr:
-        if st.button("Clear", use_container_width=True, key="ra_clear"):
+        if st.button("Clear", width="stretch", key="ra_clear"):
             for k in ["ra_raw","ra_cleaned","ra_error","ra_tech_q","ra_tech_err","ra_eval_q","ra_eval_a","ra_eval_r","ra_eval_err"]:
                 st.session_state[k] = None
             st.rerun()
@@ -1964,7 +1970,7 @@ with tab_resume:
         st.divider()
         st.markdown("### Technical Question + Evaluation")
 
-        if st.button("⚡  Generate Question", type="primary", use_container_width=True, key="ra_tech_btn"):
+        if st.button("⚡  Generate Question", type="primary", width="stretch", key="ra_tech_btn"):
             st.session_state["ra_tech_q"] = None
             st.session_state["ra_tech_err"] = None
             st.session_state["ra_eval_q"] = None
@@ -1990,7 +1996,7 @@ with tab_resume:
             st.markdown("")
             ra_user_answer = st.text_area("Your Answer", height=130, key="ra_answer_input",
                                           placeholder="Type your answer here...")
-            if st.button("🧠  Evaluate Answer", type="primary", use_container_width=True, key="ra_eval_btn"):
+            if st.button("🧠  Evaluate Answer", type="primary", width="stretch", key="ra_eval_btn"):
                 st.session_state["ra_eval_r"]   = None
                 st.session_state["ra_eval_err"] = None
                 if not ra_user_answer or not ra_user_answer.strip():
@@ -2064,7 +2070,7 @@ with tab_ats:
         value=False, key="ats_want_recruiter_take",
     )
 
-    if st.button("✅  Check ATS Score", type="primary", use_container_width=True, key="ats_check_btn"):
+    if st.button("✅  Check ATS Score", type="primary", width="stretch", key="ats_check_btn"):
         st.session_state["ats_result"] = None
         st.session_state["ats_error"] = None
         has_resume = (ats_text and ats_text.strip()) or ats_file
@@ -2268,7 +2274,7 @@ with tab_predict:
 
     pq_count = st.slider("How many questions?", min_value=5, max_value=20, value=10, key="pq_count")
 
-    if st.button("🔮  Predict Questions", type="primary", use_container_width=True, key="pq_predict_btn"):
+    if st.button("🔮  Predict Questions", type="primary", width="stretch", key="pq_predict_btn"):
         st.session_state["predict_result"] = None
         st.session_state["predict_error"] = None
         has_resume = (pq_text and pq_text.strip()) or pq_file
