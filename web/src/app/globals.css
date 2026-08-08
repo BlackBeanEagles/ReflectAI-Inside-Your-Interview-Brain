@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+/* Same palette as the existing Streamlit app (frontend/app.py) so the new
+   frontend is a visual continuation, not a different product. Defined once
+   as variables and re-pointed for dark mode via :root[data-theme] and the
+   OS-level media query, so every component stays readable either way. */
+:root {
+  --ri-surface: #ffffff;
+  --ri-surface-alt: #f8faff;
+  --ri-surface-mute: #f5f5f9;
+  --ri-border: #e0e5f5;
+  --ri-text: #1a1a2e;
+  --ri-text-mute: #666a75;
+  --ri-track: #e8eaf0;
+
+  --ri-accent: #4f6ef7;
+  --ri-tech: #e86a2d;
+  --ri-stress: #a1122a;
+
+  --ri-good-bg: #e8fff0;
+  --ri-good-fg: #145c32;
+  --ri-good-line: #1a7a44;
+  --ri-warn-bg: #fff5e8;
+  --ri-warn-fg: #7a3008;
+  --ri-warn-line: #c0470a;
+  --ri-info-bg: #f0f4ff;
+  --ri-info-fg: #1a2e8c;
+  --ri-info-line: #4f6ef7;
+  --ri-purple-bg: #f3f0ff;
+  --ri-purple-fg: #3a1d8c;
+  --ri-purple-line: #7c4dff;
+  --ri-chip-bg: #e8eeff;
+  --ri-chip-fg: #2d3a8c;
+
+  --background: var(--ri-surface);
+  --foreground: var(--ri-text);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ri-surface: #171a24;
+    --ri-surface-alt: #1b1f2c;
+    --ri-surface-mute: #1e222e;
+    --ri-border: #2e3446;
+    --ri-text: #e8ebf5;
+    --ri-text-mute: #9aa2b8;
+    --ri-track: #2a2f3d;
+
+    --ri-good-bg: #12301f;
+    --ri-good-fg: #8ee6b0;
+    --ri-good-line: #2fa060;
+    --ri-warn-bg: #33210f;
+    --ri-warn-fg: #f0b98a;
+    --ri-warn-line: #e07b32;
+    --ri-info-bg: #171f3d;
+    --ri-info-fg: #a9baff;
+    --ri-info-line: #6b86ff;
+    --ri-purple-bg: #221a3d;
+    --ri-purple-fg: #c3aeff;
+    --ri-purple-line: #8e6bff;
+    --ri-chip-bg: #212844;
+    --ri-chip-fg: #b6c2ff;
+
+    --background: var(--ri-surface);
+    --foreground: var(--ri-text);
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ri-surface: var(--ri-surface);
+  --color-ri-surface-alt: var(--ri-surface-alt);
+  --color-ri-surface-mute: var(--ri-surface-mute);
+  --color-ri-border: var(--ri-border);
+  --color-ri-text: var(--ri-text);
+  --color-ri-text-mute: var(--ri-text-mute);
+  --color-ri-accent: var(--ri-accent);
+  --color-ri-tech: var(--ri-tech);
+  --color-ri-stress: var(--ri-stress);
+  --color-ri-good-bg: var(--ri-good-bg);
+  --color-ri-good-fg: var(--ri-good-fg);
+  --color-ri-good-line: var(--ri-good-line);
+  --color-ri-warn-bg: var(--ri-warn-bg);
+  --color-ri-warn-fg: var(--ri-warn-fg);
+  --color-ri-warn-line: var(--ri-warn-line);
+  --color-ri-info-bg: var(--ri-info-bg);
+  --color-ri-info-fg: var(--ri-info-fg);
+  --color-ri-info-line: var(--ri-info-line);
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+@keyframes ri-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.ri-fade-in {
+  animation: ri-fade-in 0.35s ease both;
+}
+
+.ri-hero-title {
+  background: linear-gradient(135deg, var(--ri-accent), var(--ri-tech));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
