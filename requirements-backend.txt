@@ -1,0 +1,17 @@
+# Backend-only dependencies -- what api/, app/, services/, agents/, models/,
+# and utils/ actually import. requirements.txt (kept for frontend/app.py,
+# the Streamlit app) additionally pulls in streamlit/altair/pandas/numpy/
+# pyarrow/etc., none of which the backend uses -- verified via grep across
+# every backend module for their import names. Used by Dockerfile so the
+# backend image doesn't ship ~500MB of unused frontend dependencies.
+fastapi==0.135.3
+uvicorn==0.44.0
+pydantic==2.13.0
+python-multipart==0.0.26
+bcrypt==4.3.0
+fpdf2==2.8.7
+psycopg[binary,pool]==3.2.10
+PyJWT==2.13.0
+pypdf==6.10.2
+python-dotenv==1.2.2
+requests==2.33.1

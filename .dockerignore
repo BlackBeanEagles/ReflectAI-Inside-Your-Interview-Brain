@@ -1,0 +1,25 @@
+# Never let local secrets or dev artifacts end up baked into an image layer.
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.log
+
+# Frontends aren't part of the backend image (see Dockerfile).
+frontend/
+web/
+
+# Not needed at runtime.
+tests/
+README.md
+DEPLOY.md
+PRIVACY.md
+requirements-dev.txt
+.claude/

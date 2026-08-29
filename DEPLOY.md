@@ -5,8 +5,13 @@ Two pieces, hosted separately, both on free tiers:
 | Piece | Where | Why |
 |---|---|---|
 | Backend (FastAPI) | Render free web service (Docker) | Free tier, supports the `Dockerfile` in this repo directly |
-| Frontend (Streamlit) | Streamlit Community Cloud | Free, purpose-built for Streamlit apps, zero config beyond the repo |
+| Frontend | **`web/` (Next.js)**, recommended — see step 3 below | The current, feature-complete frontend (see `web/README.md`'s parity table) |
 | LLM | Groq API | Free tier, no card, fast — no GPU needed (unlike Ollama) |
+
+`frontend/app.py` (Streamlit) is the older frontend this one replaced — it
+still works and can still be deployed to Streamlit Community Cloud if you
+prefer it, but `web/` is what's actively maintained and what these steps
+deploy by default.
 
 Local dev keeps using Ollama (`LLM_PROVIDER=ollama`, the default) — nothing
 changes for that workflow. Production should use Groq instead, because no free
@@ -37,35 +42,51 @@ no traffic and take a few seconds to wake back up on the next request — the
 first request after idle will be slow, not broken. This is expected on free
 hosting, not a bug.
 
-## 3. Deploy the frontend to Streamlit Community Cloud
+## 3. Deploy the frontend (`web/`) to Vercel
 
-1. Go to https://share.streamlit.io → **New app** → point it at this repo,
-   branch `main` (or whichever you use), main file path `frontend/app.py`.
-2. Before deploying, open **Advanced settings → Secrets** and add:
-   ```toml
-   BACKEND_BASE = "https://<your-render-url>"
+1. Go to https://vercel.com → **Add New → Project** → import this repo.
+2. Set **Root Directory** to `web` (Vercel auto-detects it's a Next.js app
+   once you do — leave the build/output settings at their defaults).
+3. Under **Environment Variables**, add:
    ```
-3. Deploy. You'll get a URL like `https://your-app.streamlit.app`.
+   NEXT_PUBLIC_API_BASE = https://<your-render-url>
+   ```
+4. Deploy. You'll get a URL like `https://your-app.vercel.app`.
 
 ## 4. Point the backend's CORS at the real frontend URL
 
 Go back to Render → your service → **Environment** → update:
 
 ```
-ALLOWED_ORIGINS=https://your-app.streamlit.app
+ALLOWED_ORIGINS=https://your-app.vercel.app
 ```
 
 (Multiple origins are comma-separated if you also want to keep localhost
-working for local testing against the hosted backend.)
+working for local testing against the hosted backend, e.g.
+`http://localhost:3000,https://your-app.vercel.app`.)
 
 Redeploy the backend for the change to take effect.
 
 ## 5. Verify end to end
 
-Open the Streamlit Cloud URL. The status strip at the top should read
-`llama-3.1-8b-instant ready (groq)`. Paste a resume and run through one
-question — if `ALLOWED_ORIGINS` is wrong you'll see a CORS error in the
-browser console rather than a Python traceback; double-check step 4.
+Open the Vercel URL. The nav bar's status dot next to the logo should be
+green (backend reachable). Paste a resume and run through one question — if
+`ALLOWED_ORIGINS` is wrong you'll see a CORS error in the browser console
+rather than a normal response; double-check step 4.
+
+## Alternative: the older Streamlit frontend
+
+`frontend/app.py` still works if you'd rather use it instead of (or
+alongside) `web/`:
+
+1. Go to https://share.streamlit.io → **New app** → point it at this repo,
+   main file path `frontend/app.py`.
+2. Under **Advanced settings → Secrets**, add:
+   ```toml
+   BACKEND_BASE = "https://<your-render-url>"
+   ```
+3. Deploy, then add the resulting `https://your-app.streamlit.app` URL to
+   `ALLOWED_ORIGINS` on the backend the same way as step 4 above.
 
 ## What's already handled for a public deployment
 
