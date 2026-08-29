@@ -499,18 +499,26 @@ def _build_improvement_plan(
     category_scores: Dict[str, Dict],
     missing_keywords: List[Dict],
     keyword_total_weight: float,
+    weights: Dict[str, int],
 ) -> List[Dict]:
     """
     Every item's estimated_gain is derived exactly, not guessed: a failed
     check's gain is its category's weight split evenly across that
     category's checks; a missing keyword's gain is its share of the total
-    keyword weight, scaled by the keyword-match category's weight (40).
+    keyword weight, scaled by the keyword-match category's weight.
+
+    `weights` is display_weights from the caller, not the fixed
+    CATEGORY_WEIGHTS -- when no job description was given, keyword_match
+    is absent and the rest are rescaled to sum to 100, and estimated_gain
+    needs to track the weight actually driving the overall score, not the
+    weight it would have had if a job description were present.
+
     Ranked by estimated_gain descending — highest-ROI fix first.
     """
     items: List[Dict] = []
 
     for cat_key, cat in category_scores.items():
-        cat_weight = CATEGORY_WEIGHTS[cat_key]
+        cat_weight = weights[cat_key]
         failed = [c for c in cat["checks"] if not c["passed"]]
         if not failed:
             continue
@@ -525,19 +533,20 @@ def _build_improvement_plan(
                 "effort": _EFFORT_BY_CATEGORY[cat_key],
             })
 
-    kw_weight_pct = CATEGORY_WEIGHTS["keyword_match"]
-    for kw in missing_keywords[:10]:
-        gain = (kw["weight"] / keyword_total_weight) * kw_weight_pct if keyword_total_weight else 0
-        if gain < 0.3:
-            continue
-        items.append({
-            "priority": "high" if gain >= 3 else ("medium" if gain >= 1 else "low"),
-            "category": "Keyword Match",
-            "action": f"Add '{kw['keyword']}' if it genuinely applies to you.",
-            "reason": "This term appears in the job description but wasn't found in your resume.",
-            "estimated_gain": round(gain, 1),
-            "effort": _EFFORT_BY_CATEGORY["keyword_match"],
-        })
+    if "keyword_match" in weights:
+        kw_weight_pct = weights["keyword_match"]
+        for kw in missing_keywords[:10]:
+            gain = (kw["weight"] / keyword_total_weight) * kw_weight_pct if keyword_total_weight else 0
+            if gain < 0.3:
+                continue
+            items.append({
+                "priority": "high" if gain >= 3 else ("medium" if gain >= 1 else "low"),
+                "category": "Keyword Match",
+                "action": f"Add '{kw['keyword']}' if it genuinely applies to you.",
+                "reason": "This term appears in the job description but wasn't found in your resume.",
+                "estimated_gain": round(gain, 1),
+                "effort": _EFFORT_BY_CATEGORY["keyword_match"],
+            })
 
     items.sort(key=lambda x: -x["estimated_gain"])
     return items
@@ -575,21 +584,48 @@ def generate_recruiter_take(resume_text: str, job_description: str) -> Optional[
         return None
 
 
+def _build_methodology(has_jd: bool, display_weights: Dict[str, int]) -> str:
+    weight_bits = ", ".join(f"{CATEGORY_LABELS[k]} {w}%" for k, w in display_weights.items())
+    if has_jd:
+        return (
+            f"Deterministic, weighted-category scoring — not an LLM estimate: {weight_bits}. "
+            "Keywords are extracted from the job description weighted by frequency, boosted "
+            "~1.6x for 'required'/'must-have' language and reduced ~0.6x for 'preferred'/"
+            "'nice-to-have', with common synonyms (JS/JavaScript, Postgres/PostgreSQL, "
+            "K8s/Kubernetes) folded together. The same inputs always produce the same score. "
+            "The optional 'recruiter_take' field is the one exception — it's LLM-generated "
+            "qualitative feedback, not deterministic, and is never part of the numeric score."
+        )
+    return (
+        "Deterministic, resume-only scoring — no job description was provided, so Keyword "
+        "Match (normally 40% of a full score) can't be computed and is excluded rather than "
+        f"scored 0. The remaining categories are rescaled to still sum to 100%: {weight_bits}. "
+        "Add a job description any time to also get keyword-match scoring, a recruiter's first "
+        "read, and role-specific keyword suggestions."
+    )
+
+
 def score_resume_against_job(
     resume_text: str,
-    job_description: str,
+    job_description: str = "",
     is_from_pdf: bool = False,
     include_recruiter_take: bool = False,
 ) -> Dict:
     """
-    Score a resume against a job description using the 7 weighted
-    categories documented at the top of this module. Deterministic —
-    same inputs always produce the same score.
+    Score a resume against a job description using the weighted categories
+    documented at the top of this module. Deterministic — same inputs
+    always produce the same score.
+
+    job_description is optional. Without one, Keyword Match (normally 40%
+    of the score) has nothing to match against, so it's excluded entirely
+    rather than scored 0 — scoring it 0 would unfairly tank every resume
+    checked for general ATS-readiness rather than against one specific
+    posting. The other six categories are rescaled to still sum to 100%.
     """
     resume_text = resume_text or ""
-    job_description = job_description or ""
+    job_description = (job_description or "").strip()
+    has_jd = bool(job_description)
 
-    kw_score, kw_checks, matched, missing, kw_total_weight = _score_keyword_match(resume_text, job_description)
     exp_score, exp_checks = _score_experience_relevance(resume_text)
     fmt_score, fmt_checks = _score_ats_formatting(resume_text, is_from_pdf)
     skills_score, skills_checks = _score_skills_section(resume_text)
@@ -597,8 +633,7 @@ def score_resume_against_job(
     contact_score, contact_checks = _score_contact_information(resume_text)
     grammar_score, grammar_checks = _score_grammar_readability(resume_text)
 
-    category_scores = {
-        "keyword_match": {"score": kw_score, "checks": kw_checks},
+    category_scores: Dict[str, Dict] = {
         "experience_relevance": {"score": exp_score, "checks": exp_checks},
         "ats_formatting": {"score": fmt_score, "checks": fmt_checks},
         "skills_section": {"score": skills_score, "checks": skills_checks},
@@ -607,7 +642,21 @@ def score_resume_against_job(
         "grammar_readability": {"score": grammar_score, "checks": grammar_checks},
     }
 
-    overall = sum(category_scores[c]["score"] * CATEGORY_WEIGHTS[c] for c in CATEGORY_WEIGHTS) / 100
+    matched: List[Dict] = []
+    missing: List[Dict] = []
+    kw_total_weight = 0.0
+    if has_jd:
+        kw_score, kw_checks, matched, missing, kw_total_weight = _score_keyword_match(resume_text, job_description)
+        category_scores = {"keyword_match": {"score": kw_score, "checks": kw_checks}, **category_scores}
+
+    active_weights = {k: CATEGORY_WEIGHTS[k] for k in category_scores}
+    total_active_weight = sum(active_weights.values())
+    display_weights: Dict[str, int] = (
+        dict(active_weights) if has_jd
+        else {k: round(w / total_active_weight * 100) for k, w in active_weights.items()}
+    )
+
+    overall = sum(category_scores[c]["score"] * active_weights[c] for c in category_scores) / total_active_weight
     overall = round(overall)
 
     if overall >= 80:
@@ -623,23 +672,24 @@ def score_resume_against_job(
         {
             "key": key,
             "label": CATEGORY_LABELS[key],
-            "weight": CATEGORY_WEIGHTS[key],
+            "weight": display_weights[key],
             "score": category_scores[key]["score"],
             "checks": category_scores[key]["checks"],
         }
-        for key in CATEGORY_WEIGHTS
+        for key in category_scores
     ]
 
     keyword_importance = []
-    all_kw = matched + missing
-    max_weight = max((k["weight"] for k in all_kw), default=1) or 1
-    for k in sorted(all_kw, key=lambda x: -x["weight"])[:15]:
-        keyword_importance.append({
-            "keyword": k["keyword"],
-            "weight": k["weight"],
-            "importance_pct": round((k["weight"] / max_weight) * 100, 1),
-            "matched": k in matched,
-        })
+    if has_jd:
+        all_kw = matched + missing
+        max_weight = max((k["weight"] for k in all_kw), default=1) or 1
+        for k in sorted(all_kw, key=lambda x: -x["weight"])[:15]:
+            keyword_importance.append({
+                "keyword": k["keyword"],
+                "weight": k["weight"],
+                "importance_pct": round((k["weight"] / max_weight) * 100, 1),
+                "matched": k in matched,
+            })
 
     section_ranking = [
         {"section": "Skills", "score": round(skills_score / 10, 1)},
@@ -649,13 +699,20 @@ def score_resume_against_job(
         {"section": "Formatting", "score": round(fmt_score / 10, 1)},
     ]
 
-    improvement_plan = _build_improvement_plan(category_scores, missing, kw_total_weight)
+    improvement_plan = _build_improvement_plan(category_scores, missing, kw_total_weight, display_weights)
 
-    recruiter_take = generate_recruiter_take(resume_text, job_description) if include_recruiter_take else None
+    # Recruiter take is a read of the resume against the job description --
+    # without a job description there's nothing for it to compare against,
+    # so silently skip it rather than erroring even if the caller asked for it.
+    recruiter_take = (
+        generate_recruiter_take(resume_text, job_description)
+        if (include_recruiter_take and has_jd) else None
+    )
 
     return {
         "overall_score": overall,
         "rating": rating,
+        "has_job_description": has_jd,
         "categories": categories_out,
         "matched_keywords": matched[:20],
         "missing_keywords": missing[:15],
@@ -663,15 +720,5 @@ def score_resume_against_job(
         "section_ranking": section_ranking,
         "improvement_plan": improvement_plan,
         "recruiter_take": recruiter_take,
-        "methodology": (
-            "Deterministic, weighted-category scoring — not an LLM estimate: Keyword Match 40%, "
-            "Experience Relevance 20%, ATS Formatting 15%, Skills Section 12%, Education & "
-            "Certifications 7%, Contact Information 3%, Grammar & Readability 3%. Keywords are "
-            "extracted from the job description weighted by frequency, boosted ~1.6x for "
-            "'required'/'must-have' language and reduced ~0.6x for 'preferred'/'nice-to-have', "
-            "with common synonyms (JS/JavaScript, Postgres/PostgreSQL, K8s/Kubernetes) folded "
-            "together. The same inputs always produce the same score. The optional "
-            "'recruiter_take' field is the one exception — it's LLM-generated qualitative "
-            "feedback, not deterministic, and is never part of the numeric score."
-        ),
+        "methodology": _build_methodology(has_jd, display_weights),
     }

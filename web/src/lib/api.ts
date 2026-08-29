@@ -200,7 +200,7 @@ export function transcribeAudio(blob: Blob): Promise<TranscribeResponse> {
 
 export function scoreAts(
   opts: {
-    jobDescription: string;
+    jobDescription?: string;
     text?: string;
     file?: File;
     includeRecruiterTake?: boolean;
@@ -208,7 +208,7 @@ export function scoreAts(
   signal?: AbortSignal,
 ): Promise<ATSScoreResponse> {
   const form = new FormData();
-  form.append("job_description", opts.jobDescription);
+  if (opts.jobDescription) form.append("job_description", opts.jobDescription);
   form.append("include_recruiter_take", String(!!opts.includeRecruiterTake));
   if (opts.file) form.append("file", opts.file);
   else if (opts.text) form.append("text", opts.text);

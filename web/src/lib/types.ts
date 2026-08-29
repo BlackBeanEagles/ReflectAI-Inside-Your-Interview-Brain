@@ -182,6 +182,7 @@ export interface ATSSectionScore {
 export interface ATSScoreResponse {
   overall_score: number;
   rating: string;
+  has_job_description: boolean;
   categories: ATSCategory[];
   matched_keywords: ATSKeywordItem[];
   missing_keywords: ATSKeywordItem[];

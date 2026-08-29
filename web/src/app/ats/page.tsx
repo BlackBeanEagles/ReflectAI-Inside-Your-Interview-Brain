@@ -20,16 +20,14 @@ export default function AtsScorePage() {
   const [error, setError] = useState<string | null>(null);
   const nextCheckSignal = useAbortSignal();
 
+  const hasJobDescription = jobDescription.trim().length > 0;
+
   async function handleCheck() {
     setError(null);
-    // Resume and job description can be filled in either order -- both are
-    // just checked together at submit time, so picking a resume never
-    // requires the job description to already be there (or vice versa).
-    const missing: string[] = [];
-    if (!(method === "paste" ? text.trim() : file)) missing.push("your resume (paste or upload)");
-    if (!jobDescription.trim()) missing.push("a job description");
-    if (missing.length > 0) {
-      setError(`Please add ${missing.join(" and ")} before checking your score.`);
+    // Job description is optional -- see services/ats_scorer.py. Only the
+    // resume is actually required to check anything.
+    if (!(method === "paste" ? text.trim() : file)) {
+      setError("Please add your resume (paste or upload) before checking your score.");
       return;
     }
     const signal = nextCheckSignal();
@@ -38,10 +36,13 @@ export default function AtsScorePage() {
     try {
       const res = await api.scoreAts(
         {
-          jobDescription: jobDescription.trim(),
+          jobDescription: hasJobDescription ? jobDescription.trim() : undefined,
           text: method === "paste" ? text.trim() : undefined,
           file: method === "upload" ? file! : undefined,
-          includeRecruiterTake: wantRecruiterTake,
+          // Recruiter's take compares the resume against the job description --
+          // nothing to compare without one, so it's ignored server-side either
+          // way, but skip sending it too so the button label doesn't lie.
+          includeRecruiterTake: wantRecruiterTake && hasJobDescription,
         },
         signal,
       );
@@ -62,10 +63,11 @@ export default function AtsScorePage() {
       <div>
         <h1 className="text-2xl font-extrabold mb-1">✅ ATS Score</h1>
         <p className="text-ri-text-mute text-sm">
-          Check how a resume scores against a specific job posting, the way a real ATS/resume
-          screener actually evaluates candidates — 7 weighted categories, each fully traceable.
-          This is <b>not</b> an AI-guessed number: the same resume + job description always
-          produce the same score.
+          Check how a resume holds up against a specific job posting, the way a real ATS/resume
+          screener actually evaluates candidates — weighted categories, each fully traceable.
+          This is <b>not</b> an AI-guessed number: the same inputs always produce the same score.
+          A job description is optional — add one to also get keyword-match scoring against that
+          specific posting; without one you still get a full resume-readiness check.
         </p>
       </div>
 
@@ -86,31 +88,36 @@ export default function AtsScorePage() {
         />
         <div className="mt-5">
           <TextArea
-            label="Job description"
+            label="Job description (optional)"
             value={jobDescription}
             onChange={setJobDescription}
-            placeholder="Paste the full job posting here — the more complete it is, the more accurate the keyword match."
+            placeholder="Paste a job posting to also score keyword match against it — the more complete it is, the more accurate the match. Leave blank for a general resume-readiness check."
             rows={7}
           />
         </div>
-        <label className="flex items-start gap-2 mt-4 text-sm">
+        <label
+          className={`flex items-start gap-2 mt-4 text-sm ${hasJobDescription ? "" : "opacity-50"}`}
+        >
           <input
             type="checkbox"
             checked={wantRecruiterTake}
+            disabled={!hasJobDescription}
             onChange={(e) => setWantRecruiterTake(e.target.checked)}
             className="mt-0.5"
           />
           <span>
             Also get a recruiter&apos;s first impression (AI-generated, ~10-20s extra — subjective,
-            not part of the score above)
+            not part of the score above){!hasJobDescription && " — needs a job description to compare against"}
           </span>
         </label>
         <div className="mt-5">
           <PrimaryButton onClick={handleCheck} disabled={loading} className="w-full">
             {loading
-              ? wantRecruiterTake
+              ? wantRecruiterTake && hasJobDescription
                 ? "Scoring resume + asking for a recruiter's first read…"
-                : "Scoring resume against job description…"
+                : hasJobDescription
+                  ? "Scoring resume against job description…"
+                  : "Scoring resume…"
               : "✅ Check ATS Score"}
           </PrimaryButton>
         </div>
@@ -126,6 +133,16 @@ export default function AtsScorePage() {
               Overall ATS Score — {result.rating}
             </div>
           </div>
+
+          {!result.has_job_description && (
+            <div className="mb-5">
+              <Alert kind="info">
+                This is a general resume-readiness check. Add a job description above and check
+                again to also score keyword match against that specific posting (worth up to 40%
+                of a full score) and get a recruiter&apos;s first read.
+              </Alert>
+            </div>
+          )}
 
           <h3 className="font-bold text-sm mb-2">Category breakdown</h3>
           <div className="space-y-2 mb-5">
@@ -161,22 +178,26 @@ export default function AtsScorePage() {
             ))}
           </div>
 
-          <h3 className="font-bold text-sm mb-2">Keyword importance</h3>
-          <div className="space-y-1.5 mb-5">
-            {result.keyword_importance.slice(0, 12).map((kw, i) => (
-              <div key={i} className="flex items-center gap-3 text-sm">
-                <span className={`w-24 sm:w-40 shrink-0 truncate ${kw.matched ? "" : "text-ri-text-mute"}`}>
-                  {kw.matched ? "✅" : "❌"} {kw.keyword}
-                </span>
-                <div className="flex-1 h-2 rounded-full bg-ri-track overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-ri-accent"
-                    style={{ width: `${kw.importance_pct}%` }}
-                  />
-                </div>
+          {result.has_job_description && result.keyword_importance.length > 0 && (
+            <>
+              <h3 className="font-bold text-sm mb-2">Keyword importance</h3>
+              <div className="space-y-1.5 mb-5">
+                {result.keyword_importance.slice(0, 12).map((kw, i) => (
+                  <div key={i} className="flex items-center gap-3 text-sm">
+                    <span className={`w-24 sm:w-40 shrink-0 truncate ${kw.matched ? "" : "text-ri-text-mute"}`}>
+                      {kw.matched ? "✅" : "❌"} {kw.keyword}
+                    </span>
+                    <div className="flex-1 h-2 rounded-full bg-ri-track overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-ri-accent"
+                        style={{ width: `${kw.importance_pct}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
 
           {result.improvement_plan.length > 0 && (
             <div>

@@ -204,3 +204,59 @@ def test_format_check_missing_when_not_pdf():
     fmt = _category(result, "ats_formatting")
     check_names = {c["name"] for c in fmt["checks"]}
     assert "PDF text is extractable" not in check_names
+
+
+# ── Optional job description ──────────────────────────────────────────────────
+
+def test_no_job_description_excludes_keyword_match_and_rescales_the_rest():
+    result = score_resume_against_job(STRONG_RESUME)
+    assert result["has_job_description"] is False
+    keys = {c["key"] for c in result["categories"]}
+    assert "keyword_match" not in keys
+    assert keys == set(CATEGORY_WEIGHTS.keys()) - {"keyword_match"}
+    assert sum(c["weight"] for c in result["categories"]) == 100
+
+
+def test_no_job_description_still_produces_a_sensible_score():
+    strong = score_resume_against_job(STRONG_RESUME)
+    weak = score_resume_against_job(WEAK_RESUME)
+    assert strong["overall_score"] > weak["overall_score"]
+    expected = round(sum(c["score"] * c["weight"] for c in strong["categories"]) / 100)
+    assert strong["overall_score"] == expected
+
+
+def test_no_job_description_means_no_keyword_data_at_all():
+    result = score_resume_against_job(STRONG_RESUME)
+    assert result["matched_keywords"] == []
+    assert result["missing_keywords"] == []
+    assert result["keyword_importance"] == []
+    assert not any(item["category"] == "Keyword Match" for item in result["improvement_plan"])
+
+
+def test_no_job_description_skips_recruiter_take_even_if_requested(monkeypatch):
+    def fake_call_llm(prompt, purpose="default", timeout=20, use_cache=True):
+        return "should never be called"
+    import utils.llm
+    monkeypatch.setattr(utils.llm, "call_llm", fake_call_llm)
+    result = score_resume_against_job(STRONG_RESUME, include_recruiter_take=True)
+    assert result["recruiter_take"] is None
+
+
+def test_whitespace_only_job_description_is_treated_as_no_job_description():
+    result = score_resume_against_job(STRONG_RESUME, "   \n  ")
+    assert result["has_job_description"] is False
+
+
+def test_job_description_present_reports_has_job_description_true_with_full_weights():
+    result = score_resume_against_job(STRONG_RESUME, JD)
+    assert result["has_job_description"] is True
+    for c in result["categories"]:
+        assert c["weight"] == CATEGORY_WEIGHTS[c["key"]]
+
+
+def test_methodology_text_differs_with_and_without_job_description():
+    with_jd = score_resume_against_job(STRONG_RESUME, JD)["methodology"]
+    without_jd = score_resume_against_job(STRONG_RESUME)["methodology"]
+    assert "Keyword Match 40%" in with_jd
+    assert "Keyword Match 40%" not in without_jd  # excluded from the active weight list, not silently 0
+    assert "no job description" in without_jd.lower()

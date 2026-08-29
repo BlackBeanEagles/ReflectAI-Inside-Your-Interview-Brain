@@ -251,7 +251,7 @@ def next_question_endpoint(request: NextQuestionRequest):
 
 @router.post("/ats-score", response_model=ATSScoreResponse)
 def ats_score_endpoint(
-    job_description: str = Form(...),
+    job_description: Optional[str] = Form(None),
     text: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     include_recruiter_take: bool = Form(False),
@@ -259,18 +259,24 @@ def ats_score_endpoint(
     """
     POST /ats-score
 
-    Scores a resume against a job description using 7 weighted categories
-    the way a real ATS/resume screener would — deterministic, no LLM
-    involved in computing any score (see services/ats_scorer.py). Accepts
-    the resume as either pasted text or a PDF upload, same as /parse-resume.
+    Scores a resume using weighted categories the way a real ATS/resume
+    screener would — deterministic, no LLM involved in computing any score
+    (see services/ats_scorer.py). Accepts the resume as either pasted text
+    or a PDF upload, same as /parse-resume.
+
+    job_description is optional: without one, Keyword Match (normally 40%
+    of the score) can't be computed and is excluded rather than scored 0,
+    with the other categories rescaled to still sum to 100% — see
+    services/ats_scorer.score_resume_against_job. Provide one to also get
+    keyword-match scoring and role-specific keyword suggestions.
 
     include_recruiter_take=true additionally asks the LLM for a short,
     non-deterministic "recruiter's first read" — opt-in and off by default
     so the (free, instant) deterministic score never waits on an LLM call.
+    It requires a job description (there's nothing to compare the resume
+    against otherwise) and is silently skipped without one.
     """
-    if not job_description or not job_description.strip():
-        raise HTTPException(status_code=400, detail="job_description is required.")
-    if len(job_description) > MAX_JD_CHARS:
+    if job_description and len(job_description) > MAX_JD_CHARS:
         raise HTTPException(
             status_code=413,
             detail=f"Job description too long. Max is {MAX_JD_CHARS} characters.",
@@ -304,7 +310,7 @@ def ats_score_endpoint(
 
     result = score_resume_against_job(
         resume_text=resume_text,
-        job_description=job_description,
+        job_description=job_description or "",
         is_from_pdf=is_from_pdf,
         include_recruiter_take=include_recruiter_take,
     )

@@ -90,6 +90,7 @@ class ATSScoreResponse(BaseModel):
     """
     overall_score: float
     rating: str
+    has_job_description: bool
     categories: List[ATSCategory]
     matched_keywords: List[ATSKeywordItem]
     missing_keywords: List[ATSKeywordItem]
