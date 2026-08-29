@@ -16,13 +16,25 @@ const NAV_ITEMS = [
 function StatusDot() {
   const { health, checked } = useHealth();
   if (!checked) {
-    return <span className="inline-block w-2 h-2 rounded-full bg-ri-text-mute" />;
+    return (
+      <span
+        role="status"
+        aria-label="Checking backend status…"
+        className="inline-block w-2 h-2 rounded-full bg-ri-text-mute"
+      />
+    );
   }
   const ok = health?.api === "ok";
+  // `title` alone (a mouse-hover tooltip) isn't reliably exposed to screen
+  // readers and doesn't exist on touch devices -- aria-label carries the
+  // same text so the status is actually announced, not just visible as a
+  // colored dot.
   return (
     <span
-      className={`inline-block w-2 h-2 rounded-full ${ok ? "bg-ri-good-line" : "bg-ri-stress"}`}
+      role="status"
+      aria-label={ok ? `${health?.model} ready (${health?.provider})` : "Backend unreachable"}
       title={ok ? `${health?.model} ready (${health?.provider})` : "Backend unreachable"}
+      className={`inline-block w-2 h-2 rounded-full ${ok ? "bg-ri-good-line" : "bg-ri-stress"}`}
     />
   );
 }

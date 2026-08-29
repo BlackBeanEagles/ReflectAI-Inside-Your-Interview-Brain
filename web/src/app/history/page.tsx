@@ -180,10 +180,13 @@ export default function HistoryPage() {
               {history.map((item) => {
                 const isOpen = expanded === item.session_id;
                 const overall = item.report.overall_score;
+                const panelId = `session-detail-${item.session_id}`;
                 return (
                   <Card key={item.session_id} className="!p-0 overflow-hidden">
                     <button
                       onClick={() => setExpanded(isOpen ? null : item.session_id)}
+                      aria-expanded={isOpen}
+                      aria-controls={panelId}
                       className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-ri-surface-alt"
                     >
                       <span className="text-sm font-medium">
@@ -191,10 +194,10 @@ export default function HistoryPage() {
                         {overall != null ? `${overall.toFixed(1)}/10` : "N/A"} ·{" "}
                         {item.report.total_questions} questions
                       </span>
-                      <span className="text-ri-text-mute">{isOpen ? "▲" : "▼"}</span>
+                      <span className="text-ri-text-mute" aria-hidden="true">{isOpen ? "▲" : "▼"}</span>
                     </button>
                     {isOpen && (
-                      <div className="px-4 pb-4 pt-1 border-t border-ri-border">
+                      <div id={panelId} className="px-4 pb-4 pt-1 border-t border-ri-border">
                         <ReportView report={item.report} />
                       </div>
                     )}

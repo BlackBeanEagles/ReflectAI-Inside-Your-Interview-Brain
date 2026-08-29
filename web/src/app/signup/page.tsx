@@ -13,6 +13,7 @@ export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -26,6 +27,10 @@ export default function SignupPage() {
     }
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords don't match.");
       return;
     }
     setLoading(true);
@@ -55,6 +60,7 @@ export default function SignupPage() {
           <TextField label="Email" value={email} onChange={setEmail} type="email" />
           <TextField label="Password" value={password} onChange={setPassword} type="password"
             help="At least 8 characters." />
+          <TextField label="Confirm password" value={confirm} onChange={setConfirm} type="password" />
           <TextField label="Name (optional)" value={name} onChange={setName} />
           <PrimaryButton type="submit" disabled={loading} className="w-full">
             {loading ? "Creating account…" : "Sign up"}

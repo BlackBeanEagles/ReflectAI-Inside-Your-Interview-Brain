@@ -159,8 +159,18 @@ export function Alert({ kind, children }: { kind: "error" | "success" | "info"; 
     success: "bg-ri-good-bg text-ri-good-fg border-ri-good-line",
     info: "bg-ri-info-bg text-ri-info-fg border-ri-info-line",
   };
+  // Errors interrupt (role="alert", implicit aria-live="assertive") since a
+  // screen reader user submitting a form needs to hear about a failure
+  // immediately, the same way a sighted user sees it appear instantly.
+  // Success/info use role="status" (polite) -- worth announcing, not urgent
+  // enough to talk over whatever the user's currently doing.
   return (
-    <div className={`px-4 py-3 rounded-lg border text-sm ${styles[kind]}`}>{children}</div>
+    <div
+      role={kind === "error" ? "alert" : "status"}
+      className={`px-4 py-3 rounded-lg border text-sm ${styles[kind]}`}
+    >
+      {children}
+    </div>
   );
 }
 
