@@ -15,6 +15,14 @@ from services import auth as auth_service
 
 @pytest.fixture
 def client() -> TestClient:
+    # /auth/login and /auth/signup are rate-limited (app/main.py) -- TestClient
+    # requests all share one fake client IP, so accumulated requests from
+    # earlier tests/files in the same pytest run could otherwise trip the
+    # real 20-req/60s limit here and fail on an unrelated 429 rather than
+    # the thing each test actually checks. Same pattern as the other test
+    # files that hit rate-limited endpoints.
+    import app.main as main_module
+    main_module._request_log.clear()
     return TestClient(app)
 
 
@@ -202,4 +210,52 @@ def test_session_start_with_valid_token_links_user(client, fake_db):
 def test_session_start_with_bad_token_falls_back_to_anonymous(client):
     """An invalid token shouldn't break session creation — just treated as anonymous."""
     r = client.post("/session/start", headers={"Authorization": "Bearer garbage"})
+    assert r.status_code == 200
+
+
+# ── Session ownership (IDOR guard) ────────────────────────────────────────────
+
+def _signup_and_link_session(client, email):
+    signup = client.post("/auth/signup", json={"email": email, "password": "password123"})
+    token = signup.json()["access_token"]
+    r = client.post("/session/start", headers={"Authorization": f"Bearer {token}"})
+    return token, r.json()["session_id"]
+
+
+def test_other_user_cannot_read_someone_elses_linked_session(client, fake_db):
+    _owner_token, sid = _signup_and_link_session(client, "owner@example.com")
+    intruder_token, _ = _signup_and_link_session(client, "intruder@example.com")
+
+    r = client.get(f"/session/{sid}", headers={"Authorization": f"Bearer {intruder_token}"})
+    assert r.status_code == 403
+
+
+def test_other_user_cannot_reset_someone_elses_linked_session(client, fake_db):
+    _owner_token, sid = _signup_and_link_session(client, "owner2@example.com")
+    intruder_token, _ = _signup_and_link_session(client, "intruder2@example.com")
+
+    r = client.delete(f"/session/{sid}/reset", headers={"Authorization": f"Bearer {intruder_token}"})
+    assert r.status_code == 403
+
+
+def test_anonymous_caller_cannot_read_someone_elses_linked_session(client, fake_db):
+    _owner_token, sid = _signup_and_link_session(client, "owner3@example.com")
+
+    r = client.get(f"/session/{sid}")
+    assert r.status_code == 403
+
+
+def test_owner_can_still_read_their_own_linked_session(client, fake_db):
+    owner_token, sid = _signup_and_link_session(client, "owner4@example.com")
+
+    r = client.get(f"/session/{sid}", headers={"Authorization": f"Bearer {owner_token}"})
+    assert r.status_code == 200
+
+
+def test_anonymous_session_still_accessible_by_session_id_alone(client):
+    """Unlinked (anonymous) sessions keep the pre-existing behavior."""
+    r0 = client.post("/session/start")
+    sid = r0.json()["session_id"]
+
+    r = client.get(f"/session/{sid}")
     assert r.status_code == 200

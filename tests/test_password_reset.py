@@ -57,6 +57,12 @@ def fake_db(monkeypatch):
         return {"id": u["id"], "email": u["email"], "name": u["name"]}
 
     def fake_create_password_reset(user_id, token_hash, expires_at):
+        # Mirrors services.db.create_password_reset: expire any other still-
+        # live token for this user first, so at most one is ever valid.
+        now = datetime.now(timezone.utc)
+        for r in resets.values():
+            if r["user_id"] == user_id and r["used_at"] is None and r["expires_at"] > now:
+                r["expires_at"] = now
         reset = {
             "id": next_reset_id[0], "user_id": user_id,
             "token_hash": token_hash, "expires_at": expires_at, "used_at": None,
@@ -175,6 +181,23 @@ def test_reset_password_token_is_single_use(client, fake_db, fake_email_sent):
     r2 = client.post("/auth/reset-password", json={"token": token, "new_password": "secondnewpass"})
     assert r2.status_code == 400
     assert "already been used" in r2.json()["detail"].lower()
+
+
+def test_new_reset_request_invalidates_previous_token(client, fake_db, fake_email_sent):
+    """Requesting a second reset link must kill the first -- otherwise an
+    older, still-live link (e.g. dug out of an inbox later) could still be
+    used to take over the account after a newer reset already completed."""
+    client.post("/auth/signup", json={"email": "real@example.com", "password": "oldpassword123"})
+    old_token = _request_reset_and_get_token(client, fake_email_sent)
+    new_token = _request_reset_and_get_token(client, fake_email_sent)
+    assert old_token != new_token
+
+    r_old = client.post("/auth/reset-password", json={"token": old_token, "new_password": "somepassword1"})
+    assert r_old.status_code == 400
+    assert "expired" in r_old.json()["detail"].lower()
+
+    r_new = client.post("/auth/reset-password", json={"token": new_token, "new_password": "somepassword2"})
+    assert r_new.status_code == 200
 
 
 def test_reset_password_rejects_unknown_token(client, fake_db):
