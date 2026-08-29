@@ -98,6 +98,11 @@ uvicorn app.main:app --reload      # backend — http://127.0.0.1:8000
 streamlit run frontend/app.py      # frontend — http://localhost:8501
 ```
 
+The frontend above is the original Streamlit app. `web/` (Next.js) is the
+current, feature-complete frontend — see `web/README.md` for its own
+`npm install && npm run dev` setup (http://localhost:3000). Deploying?
+`DEPLOY.md` covers `web/`.
+
 Confirm the backend is healthy: `GET http://127.0.0.1:8000/health`.
 
 ### 4. Tests
@@ -130,7 +135,6 @@ See **[DEPLOY.md](DEPLOY.md)** for the full walkthrough: Render (backend, Docker
 | POST | `/decide-next` | Decision engine only, no LLM call (debugging/testing) |
 | POST | `/evaluate-answer` | Multi-dimensional answer evaluation + feedback |
 | POST | `/transcribe-audio` | Voice answer → text (Groq Whisper) |
-| POST | `/start-interview` | Standalone one-off HR question |
 | POST | `/session/start` | Create a session (optionally linked to a logged-in user) |
 | POST | `/session/add-interaction` | Store one evaluated turn |
 | GET | `/session/{id}` | Full session history |

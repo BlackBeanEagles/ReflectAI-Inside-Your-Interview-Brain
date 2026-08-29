@@ -36,11 +36,15 @@ def evaluate_answer_endpoint(request: EvaluateRequest):
 
     Returns a fully structured evaluation response.
     """
+    # Lengths only, never the actual question/answer text -- that's the
+    # candidate's own content, and log lines flow to a shared platform log
+    # aggregator regardless of whether DATABASE_URL/consent means it's
+    # stored anywhere else (see PRIVACY.md).
     logger.info(
-        "evaluate-answer: type=%s | Q='%s...' | A='%s...'",
+        "evaluate-answer: type=%s | Q len=%d | A len=%d",
         request.answer_type,
-        request.question[:60],
-        request.answer[:60] if request.answer else "(empty)",
+        len(request.question),
+        len(request.answer) if request.answer else 0,
     )
 
     result = evaluate_answer(
@@ -67,7 +71,7 @@ def evaluate_answer_endpoint(request: EvaluateRequest):
 
 
 @router.post("/transcribe-audio", response_model=TranscribeResponse)
-async def transcribe_audio_endpoint(file: UploadFile = File(...)):
+def transcribe_audio_endpoint(file: UploadFile = File(...)):
     """
     POST /transcribe-audio
 
@@ -75,8 +79,13 @@ async def transcribe_audio_endpoint(file: UploadFile = File(...)):
     Groq's Whisper API. Voice input for interview answers — independent of
     LLM_PROVIDER, since transcription always goes through Groq (see
     services/speech.py for why).
+
+    Plain `def` (not async def): transcribe_audio_detailed() below makes a
+    blocking `requests.post` with a 30s timeout. FastAPI runs sync path
+    functions in a threadpool, so a slow/stuck transcription no longer
+    stalls the event loop for every other concurrent request.
     """
-    audio_bytes = await file.read()
+    audio_bytes = file.file.read()
     if len(audio_bytes) > speech.MAX_AUDIO_BYTES:
         raise HTTPException(
             status_code=413,

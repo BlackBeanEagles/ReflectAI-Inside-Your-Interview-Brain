@@ -22,6 +22,8 @@ import os
 
 import requests
 
+from services.auth import mask_email
+
 logger = logging.getLogger(__name__)
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
@@ -79,7 +81,7 @@ def send_password_reset_email(to_email: str, reset_link: str) -> bool:
                 response.status_code, response.text[:300],
             )
             return False
-        logger.info("email: password reset email sent to %s", to_email)
+        logger.info("email: password reset email sent to %s", mask_email(to_email))
         return True
     except requests.exceptions.Timeout:
         logger.error("email: Resend request timed out.")

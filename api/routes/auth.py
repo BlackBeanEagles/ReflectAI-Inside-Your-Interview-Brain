@@ -96,7 +96,7 @@ def signup(request: SignupRequest):
     try:
         user = db.create_user(request.email, password_hash, request.name)
     except Exception:
-        logger.exception("auth: signup failed for %s", request.email)
+        logger.exception("auth: signup failed for %s", auth.mask_email(request.email))
         raise HTTPException(status_code=503, detail="Could not create the account right now. Try again shortly.")
     if user is None:
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
@@ -111,7 +111,7 @@ def login(request: LoginRequest):
     try:
         user = db.get_user_by_email(request.email.strip().lower())
     except Exception:
-        logger.exception("auth: login lookup failed for %s", request.email)
+        logger.exception("auth: login lookup failed for %s", auth.mask_email(request.email))
         raise HTTPException(status_code=503, detail="Could not reach the account database right now.")
     if user is None or not auth.verify_password(request.password, user["password_hash"]):
         # Same error for "no such user" and "wrong password" — don't leak which one.
@@ -152,7 +152,7 @@ def forgot_password(request: ForgotPasswordRequest):
     try:
         user = db.get_user_by_email(request.email)
     except Exception:
-        logger.exception("auth: forgot-password lookup failed for %s", request.email)
+        logger.exception("auth: forgot-password lookup failed for %s", auth.mask_email(request.email))
         # Still return the generic response -- a DB hiccup must not leak
         # "this email doesn't exist" information via an error response either.
         return ForgotPasswordResponse()

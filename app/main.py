@@ -19,7 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api.routes import auth, interview, resume, evaluation, session
+from api.routes import auth, resume, evaluation, session
 from services import db
 from utils import llm
 
@@ -65,9 +65,13 @@ app = FastAPI(
 
 # ─── CORS ──────────────────────────────────────────────────────────────────────
 # Origins are configurable via env because a hosted deployment's frontend lives
-# on a domain this code can't know in advance (e.g. *.streamlit.app). Local
-# defaults are kept so nothing breaks for dev-machine usage out of the box.
-_default_origins = "http://localhost:8501,http://127.0.0.1:8501"
+# on a domain this code can't know in advance (e.g. *.streamlit.app or
+# *.vercel.app). Local defaults cover both shipped frontends out of the box:
+# web/ (Next.js, port 3000) and the older frontend/ (Streamlit, port 8501).
+_default_origins = (
+    "http://localhost:3000,http://127.0.0.1:3000,"
+    "http://localhost:8501,http://127.0.0.1:8501"
+)
 _allowed_origins = [
     o.strip() for o in os.getenv("ALLOWED_ORIGINS", _default_origins).split(",") if o.strip()
 ]
@@ -96,6 +100,16 @@ RATE_LIMIT_MAX_REQUESTS = int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "20"))
 _RATE_LIMITED_PATHS = (
     "/next-question", "/evaluate-answer", "/session/", "/predict-questions",
     "/auth/forgot-password",
+    # /auth/login and /auth/signup do a deliberately-slow bcrypt hash/verify
+    # on every request -- unthrottled, that's an open door to both
+    # credential-stuffing and a trivial CPU-exhaustion DoS.
+    "/auth/login", "/auth/signup",
+    # /ats-score can trigger an LLM call (include_recruiter_take) and was
+    # otherwise the only LLM-adjacent endpoint with no throttle at all.
+    "/ats-score",
+    # Not currently called by the frontend, but still publicly reachable
+    # LLM-calling endpoints -- no reason to leave them unthrottled either.
+    "/technical-question", "/stress-question", "/decide-next",
 )
 _request_log: dict = defaultdict(deque)
 
@@ -118,7 +132,6 @@ async def rate_limit_middleware(request: Request, call_next):
 
 
 # Register routers
-app.include_router(interview.router,  tags=["Interview"])
 app.include_router(resume.router,     tags=["Resume"])
 app.include_router(evaluation.router, tags=["Evaluation"])
 app.include_router(session.router)   # prefix="/session", tags=["Session"] set in router

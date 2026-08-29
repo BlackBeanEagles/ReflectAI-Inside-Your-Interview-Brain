@@ -354,11 +354,25 @@ def get_user_reports(user_id: int, limit: int = 20) -> List[Dict]:
 # happen is a real problem, not a degraded experience.
 
 def create_password_reset(user_id: int, token_hash: str, expires_at) -> None:
-    """Store a hashed, expiring password reset token for a user."""
+    """
+    Store a hashed, expiring password reset token for a user.
+
+    First expires any other outstanding (unused, unexpired) reset tokens
+    already issued to this user, so at most one reset link is ever live at
+    a time. Without this, requesting a second reset link (or an old reset
+    email surfacing later -- forwarded, dug out of an inbox) would leave an
+    older, still-valid token able to take over the account even after a
+    newer reset already completed.
+    """
     pool = _get_pool()
     if pool is None:
         raise RuntimeError("Persistent storage is not configured on this server.")
     with pool.connection() as conn:
+        conn.execute(
+            "UPDATE password_resets SET expires_at = now() "
+            "WHERE user_id = %s AND used_at IS NULL AND expires_at > now()",
+            (user_id,),
+        )
         conn.execute(
             "INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES (%s, %s, %s)",
             (user_id, token_hash, expires_at),

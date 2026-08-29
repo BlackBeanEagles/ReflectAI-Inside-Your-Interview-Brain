@@ -41,6 +41,21 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", "168"))  # 7 days
 
 
+def mask_email(email: str) -> str:
+    """
+    Redact an email address for logging: keep enough to recognize/search for
+    in a support conversation, hide the rest. Log lines flow to a shared
+    platform log aggregator (see DEPLOY.md) regardless of whether
+    DATABASE_URL/consent means the email is stored anywhere else, so it
+    should never appear there in full.
+    """
+    local, _, domain = (email or "").partition("@")
+    if not domain:
+        return "***"
+    visible = local[:2]
+    return f"{visible}***@{domain}"
+
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 

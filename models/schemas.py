@@ -6,7 +6,6 @@ Using Pydantic for automatic type validation and clear error messages.
 All API routes must use these models to ensure consistency.
 
 Schemas:
-    InterviewRequest / InterviewResponse       — Week 1 HR Agent
     ResumeParseResponse                        — Week 2 Day 1+2 resume pipeline
     TechnicalQuestionRequest / Response        — Week 2 Day 3+4 technical agent
     NextQuestionRequest / NextQuestionResponse — Week 2 Day 5+6+7 orchestrated flow
@@ -22,30 +21,6 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-
-# ─── Week 1 — HR Agent ────────────────────────────────────────────────────────
-
-class InterviewRequest(BaseModel):
-    """
-    Input schema for /start-interview.
-    context is required and must be a non-empty string.
-    """
-    context: str
-
-    @field_validator("context")
-    @classmethod
-    def context_must_not_be_empty(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("context must not be empty")
-        return v.strip()
-
-
-class InterviewResponse(BaseModel):
-    """
-    Output schema for /start-interview.
-    Always returns a single question string.
-    """
-    question: str
 
 
 # ─── Week 2 Day 1+2 — Resume Pipeline ────────────────────────────────────────

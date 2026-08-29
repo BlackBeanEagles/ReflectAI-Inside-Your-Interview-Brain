@@ -138,8 +138,12 @@ Improvement: [one sentence]"""
 
 # ─── Response Parser ──────────────────────────────────────────────────────────
 
-def _parse_score_line(raw: str, label: str) -> float:
-    """Extract a numeric score from a line like 'Correctness: 8' or 'Clarity: 7.5'."""
+def _parse_score_line(raw: str, label: str) -> Optional[float]:
+    """
+    Extract a numeric score from a line like 'Correctness: 8' or 'Clarity: 7.5'.
+    Returns None (not 0.0) when the label isn't found at all, so callers can
+    tell "line missing" apart from "the model genuinely scored this 0".
+    """
     pattern = re.compile(
         rf"(?i){re.escape(label)}\s*[:\-]\s*([0-9]+(?:\.[0-9]+)?)"
     )
@@ -147,7 +151,7 @@ def _parse_score_line(raw: str, label: str) -> float:
     if m:
         val = float(m.group(1))
         return max(0.0, min(10.0, val))  # clamp to [0, 10]
-    return 0.0
+    return None
 
 
 def _parse_text_line(raw: str, label: str) -> str:
@@ -173,11 +177,13 @@ def _parse_llm_response(raw: str, answer_type: str) -> Dict:
 
     for criterion in criteria:
         score = _parse_score_line(raw, criterion["label"])
-        dim_scores[criterion["name"]] = score
+        dim_scores[criterion["name"]] = score if score is not None else 0.0
 
-    # Try to get final score from LLM, fall back to computed average
+    # Try to get final score from LLM, fall back to computed average — only
+    # when the "Final Score" line itself is missing, not when the LLM wrote
+    # a genuine 0 (see _parse_score_line's None vs 0.0 distinction above).
     final_from_llm = _parse_score_line(raw, "Final Score")
-    final_score = final_from_llm if final_from_llm > 0 else compute_final_score(dim_scores)
+    final_score = final_from_llm if final_from_llm is not None else compute_final_score(dim_scores)
 
     strength    = _parse_text_line(raw, "Strength")
     weakness    = _parse_text_line(raw, "Weakness")

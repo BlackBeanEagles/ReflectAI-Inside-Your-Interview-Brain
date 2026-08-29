@@ -54,7 +54,7 @@ MAX_JD_CHARS = int(os.getenv("MAX_JD_CHARS", "10000"))
 
 
 @router.post("/parse-resume", response_model=ResumeParseResponse)
-async def parse_resume_endpoint(
+def parse_resume_endpoint(
     text: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     session_id: Optional[str] = Form(None),
@@ -76,7 +76,11 @@ async def parse_resume_endpoint(
     pdf_bytes: Optional[bytes] = None
 
     if file is not None:
-        pdf_bytes = await file.read()
+        # Plain `def` (not async def): pypdf parsing below is blocking CPU
+        # work, and FastAPI runs sync path functions in a threadpool, so it
+        # never stalls the event loop for other concurrent requests. `.file`
+        # is the underlying SpooledTemporaryFile — sync .read() is fine here.
+        pdf_bytes = file.file.read()
         if len(pdf_bytes) > MAX_UPLOAD_BYTES:
             logger.warning(
                 "parse-resume: rejected oversized upload — name='%s', size=%d bytes",
@@ -119,10 +123,12 @@ def technical_question_endpoint(request: TechnicalQuestionRequest):
     Day 4 logic: prioritizes project-based contextual questions.
     Day 3 fallback: skill-based question when no projects provided.
     """
+    # Counts only, never the actual skills/projects -- that's content
+    # extracted from the candidate's own resume (see PRIVACY.md).
     logger.info(
-        "technical-question: skills=%s, projects=%s",
-        request.skills,
-        request.projects,
+        "technical-question: skills=%d, projects=%d",
+        len(request.skills),
+        len(request.projects),
     )
 
     question = generate_technical_question(
@@ -183,12 +189,14 @@ def next_question_endpoint(request: NextQuestionRequest):
     Returns the question plus updated round metadata so the frontend
     can display the correct round badge and question number.
     """
+    # Counts only, never the actual skills/projects -- see the note in
+    # technical_question_endpoint above.
     logger.info(
-        "next-question: count=%d, skills=%s, projects=%s, used_skills=%s",
+        "next-question: count=%d, skills=%d, projects=%d, used_skills=%d",
         request.count,
-        request.skills,
-        request.projects,
-        request.used_skills,
+        len(request.skills),
+        len(request.projects),
+        len(request.used_skills),
     )
 
     cleaned_data = {
@@ -242,7 +250,7 @@ def next_question_endpoint(request: NextQuestionRequest):
 
 
 @router.post("/ats-score", response_model=ATSScoreResponse)
-async def ats_score_endpoint(
+def ats_score_endpoint(
     job_description: str = Form(...),
     text: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
@@ -272,7 +280,9 @@ async def ats_score_endpoint(
     is_from_pdf = False
 
     if file is not None:
-        pdf_bytes = await file.read()
+        # Sync read — see the comment in parse_resume_endpoint for why this
+        # route is a plain `def` (blocking pypdf/LLM work runs off the loop).
+        pdf_bytes = file.file.read()
         if len(pdf_bytes) > MAX_UPLOAD_BYTES:
             raise HTTPException(
                 status_code=413,
@@ -302,7 +312,7 @@ async def ats_score_endpoint(
 
 
 @router.post("/predict-questions", response_model=PredictQuestionsResponse)
-async def predict_questions_endpoint(
+def predict_questions_endpoint(
     text: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     role: Optional[str] = Form(None),
@@ -318,11 +328,17 @@ async def predict_questions_endpoint(
     adaptive mock interview flow (/next-question), which asks one question
     at a time and evaluates the answer.
 
-    At least one of text, file, role, or job_description must be provided.
+    If none of text, file, role, or job_description are provided, this still
+    returns 200 with an empty question list and error=True (see
+    services/question_predictor.predict_questions, which owns that check) —
+    not an HTTP 4xx, so the frontend can render it the same way as any other
+    "couldn't generate questions" outcome.
     """
     resume_text = ""
     if file is not None:
-        pdf_bytes = await file.read()
+        # Sync read — see the comment in parse_resume_endpoint for why this
+        # route is a plain `def` (blocking pypdf/LLM work runs off the loop).
+        pdf_bytes = file.file.read()
         if len(pdf_bytes) > MAX_UPLOAD_BYTES:
             raise HTTPException(
                 status_code=413,

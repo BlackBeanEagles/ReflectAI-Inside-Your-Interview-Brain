@@ -17,6 +17,7 @@ Delegates to:
 """
 
 import logging
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -41,6 +42,24 @@ from services.replay_learning import compare_answer_versions
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/session", tags=["Session"])
+
+
+def _check_session_access(session_id: str, current: Optional[dict]) -> None:
+    """
+    Guard against one user reading/wiping/regenerating another user's
+    session by guessing or leaking a session_id (IDOR).
+
+    Sessions created while logged in (session.user_id is set) are only
+    accessible to that same user's Bearer token. Anonymous sessions
+    (user_id=None) keep working via session_id alone — that's the
+    documented anonymous-use model (see /session/start), not a gap.
+    """
+    owner_id = session_manager.get_session_user_id(session_id)
+    if owner_id is not None and (not current or current.get("user_id") != owner_id):
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have access to this session.",
+        )
 
 
 # ─── POST /session/start ──────────────────────────────────────────────────────
@@ -119,17 +138,19 @@ def add_interaction(request: AddInteractionRequest):
 # ─── GET /session/{session_id} ────────────────────────────────────────────────
 
 @router.get("/{session_id}", response_model=SessionHistoryResponse)
-def get_session(session_id: str):
+def get_session(session_id: str, current=Depends(get_optional_user)):
     """
     Retrieve the full interaction history for a session.
 
-    Raises 404 if the session_id is not found.
+    Raises 404 if the session_id is not found, 403 if it belongs to a
+    different logged-in user.
     """
     if not session_manager.session_exists(session_id):
         raise HTTPException(
             status_code=404,
             detail=f"Session '{session_id}' not found.",
         )
+    _check_session_access(session_id, current)
 
     history = session_manager.get_session(session_id)
     interactions = [InteractionItem(**item) for item in history]
@@ -144,12 +165,14 @@ def get_session(session_id: str):
 # ─── DELETE /session/{session_id}/reset ──────────────────────────────────────
 
 @router.delete("/{session_id}/reset")
-def reset_session(session_id: str):
+def reset_session(session_id: str, current=Depends(get_optional_user)):
     """
     Clear all stored interactions for the session (keeps the session_id alive).
 
-    Used when the user clicks "Reset" to start a new interview.
+    Used when the user clicks "Reset" to start a new interview. 403 if the
+    session belongs to a different logged-in user.
     """
+    _check_session_access(session_id, current)
     session_manager.reset_session(session_id)
     logger.info("session: Reset session %s", session_id)
     return {"success": True, "session_id": session_id, "message": "Session cleared."}
@@ -158,7 +181,7 @@ def reset_session(session_id: str):
 # ─── POST /session/{session_id}/report ───────────────────────────────────────
 
 @router.post("/{session_id}/report", response_model=ReportResponse)
-def generate_final_report(session_id: str):
+def generate_final_report(session_id: str, current=Depends(get_optional_user)):
     """
     Generate the final interview report from the stored session history.
 
@@ -169,8 +192,10 @@ def generate_final_report(session_id: str):
         4. Generate LLM-powered professional summary
         5. Return structured ReportResponse
 
-    Returns a safe fallback if the session is empty.
+    Returns a safe fallback if the session is empty. 403 if the session
+    belongs to a different logged-in user.
     """
+    _check_session_access(session_id, current)
     history = session_manager.get_session(session_id)
 
     logger.info(
@@ -224,8 +249,9 @@ def download_report_pdf(session_id: str, current=Depends(get_optional_user)):
     Regenerates the report fresh (cheap — no LLM calls beyond what the JSON
     endpoint already does) rather than requiring the caller to have hit the
     JSON endpoint first, so this works as a standalone "just give me the PDF"
-    call too.
+    call too. 403 if the session belongs to a different logged-in user.
     """
+    _check_session_access(session_id, current)
     history = session_manager.get_session(session_id)
     report = generate_report(history, language=session_manager.get_session_language(session_id))
 
