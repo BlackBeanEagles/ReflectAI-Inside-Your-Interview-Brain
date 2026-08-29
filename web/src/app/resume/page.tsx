@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import * as api from "@/lib/api";
-import { friendlyError, usePageTitle } from "@/lib/hooks";
+import { friendlyError, isAbortError, useAbortSignal, usePageTitle } from "@/lib/hooks";
 import { Alert, Card, PrimaryButton, ScorePanel, SecondaryButton, Spinner, TextArea } from "@/components/ui";
+import { ResumePicker } from "@/components/ResumePicker";
 import type { CleanedResume, EvaluateResponse } from "@/lib/types";
 
 export default function ResumeAnalysisPage() {
@@ -21,25 +22,34 @@ export default function ResumeAnalysisPage() {
   const [evalResult, setEvalResult] = useState<EvaluateResponse | null>(null);
   const [evalLoading, setEvalLoading] = useState(false);
 
+  const nextParseSignal = useAbortSignal();
+  const nextQuestionSignal = useAbortSignal();
+  const nextEvalSignal = useAbortSignal();
+
   async function handleParse() {
     setError(null);
     if (!(method === "paste" ? text.trim() : file)) {
       setError("Please paste your resume or upload a PDF first.");
       return;
     }
+    const signal = nextParseSignal();
     setLoading(true);
     setCleaned(null);
     setQuestion(null);
     try {
-      const result = await api.parseResume({
-        text: method === "paste" ? text.trim() : undefined,
-        file: method === "upload" ? file! : undefined,
-      });
+      const result = await api.parseResume(
+        {
+          text: method === "paste" ? text.trim() : undefined,
+          file: method === "upload" ? file! : undefined,
+        },
+        signal,
+      );
       setCleaned(result.cleaned);
     } catch (err) {
+      if (isAbortError(err)) return;
       setError(friendlyError(err));
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }
 
@@ -53,42 +63,52 @@ export default function ResumeAnalysisPage() {
 
   async function handleGenerateQuestion() {
     if (!cleaned) return;
+    const signal = nextQuestionSignal();
     setQuestionLoading(true);
     setError(null);
     try {
-      const result = await api.nextQuestion({
-        count: 2,
-        skills: cleaned.skills,
-        projects: cleaned.projects,
-        experience: cleaned.experience,
-        used_skills: [],
-        current_round: "technical",
-        score_history: [],
-        difficulty: "medium",
-        stress_count: 0,
-        max_questions: 10,
-      });
+      const result = await api.nextQuestion(
+        {
+          count: 2,
+          skills: cleaned.skills,
+          projects: cleaned.projects,
+          experience: cleaned.experience,
+          used_skills: [],
+          current_round: "technical",
+          score_history: [],
+          difficulty: "medium",
+          stress_count: 0,
+          max_questions: 10,
+        },
+        signal,
+      );
       setQuestion(result.question);
       setAnswer("");
       setEvalResult(null);
     } catch (err) {
+      if (isAbortError(err)) return;
       setError(friendlyError(err));
     } finally {
-      setQuestionLoading(false);
+      if (!signal.aborted) setQuestionLoading(false);
     }
   }
 
   async function handleEvaluate() {
     if (!question || !answer.trim()) return;
+    const signal = nextEvalSignal();
     setEvalLoading(true);
     setError(null);
     try {
-      const result = await api.evaluateAnswer({ question, answer: answer.trim(), answer_type: "technical" });
+      const result = await api.evaluateAnswer(
+        { question, answer: answer.trim(), answer_type: "technical" },
+        signal,
+      );
       setEvalResult(result);
     } catch (err) {
+      if (isAbortError(err)) return;
       setError(friendlyError(err));
     } finally {
-      setEvalLoading(false);
+      if (!signal.aborted) setEvalLoading(false);
     }
   }
 
@@ -107,39 +127,15 @@ export default function ResumeAnalysisPage() {
             <Alert kind="error">{error}</Alert>
           </div>
         )}
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setMethod("paste")}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium ${method === "paste" ? "bg-ri-accent text-white" : "border border-ri-border"}`}
-          >
-            Paste text
-          </button>
-          <button
-            onClick={() => setMethod("upload")}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium ${method === "upload" ? "bg-ri-accent text-white" : "border border-ri-border"}`}
-          >
-            Upload PDF
-          </button>
-        </div>
-        {method === "paste" ? (
-          <TextArea
-            label="Paste resume"
-            value={text}
-            onChange={setText}
-            placeholder={"Skills:\nPython, Django\n\nProjects:\nChatbot\n\nExperience:\nInternship"}
-            rows={7}
-          />
-        ) : (
-          <label className="block">
-            <span className="block text-sm font-medium mb-1.5">Upload resume PDF</span>
-            <input
-              type="file"
-              accept="application/pdf"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-              className="block w-full text-sm"
-            />
-          </label>
-        )}
+        <ResumePicker
+          method={method}
+          onMethodChange={setMethod}
+          text={text}
+          onTextChange={setText}
+          file={file}
+          onFileChange={setFile}
+          label="Your resume"
+        />
         <div className="flex gap-3 mt-4">
           <PrimaryButton onClick={handleParse} disabled={loading}>
             {loading ? "Parsing…" : "🔍 Parse Resume"}

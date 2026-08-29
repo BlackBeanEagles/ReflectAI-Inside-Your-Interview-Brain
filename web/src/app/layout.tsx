@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { ResumeProvider } from "@/lib/resume-context";
 import Nav from "@/components/Nav";
 
 const inter = Inter({
@@ -21,11 +22,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <AuthProvider>
-          <Nav />
-          <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8">{children}</main>
-          <footer className="border-t border-ri-border py-6 text-center text-xs text-ri-text-mute">
-            ReflectInterview · Adaptive multi-round interview + session report
-          </footer>
+          <ResumeProvider>
+            <Nav />
+            <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8">{children}</main>
+            <footer className="border-t border-ri-border py-6 text-center text-xs text-ri-text-mute">
+              ReflectInterview · Adaptive multi-round interview + session report
+            </footer>
+          </ResumeProvider>
         </AuthProvider>
       </body>
     </html>

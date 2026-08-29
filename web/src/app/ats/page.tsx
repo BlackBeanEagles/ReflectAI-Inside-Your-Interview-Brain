@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import * as api from "@/lib/api";
-import { friendlyError, usePageTitle } from "@/lib/hooks";
+import { friendlyError, isAbortError, useAbortSignal, usePageTitle } from "@/lib/hooks";
 import { Alert, Card, PrimaryButton, TextArea } from "@/components/ui";
 import { scoreColor } from "@/components/ui";
+import { ResumePicker } from "@/components/ResumePicker";
 import type { ATSScoreResponse } from "@/lib/types";
 
 export default function AtsScorePage() {
@@ -17,31 +18,42 @@ export default function AtsScorePage() {
   const [result, setResult] = useState<ATSScoreResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const nextCheckSignal = useAbortSignal();
 
   async function handleCheck() {
     setError(null);
-    if (!jobDescription.trim()) {
-      setError("Please paste a job description first.");
+    // Resume and job description can be filled in either order -- both are
+    // just checked together at submit time, so picking a resume never
+    // requires the job description to already be there (or vice versa).
+    const missing: string[] = [];
+    if (!(method === "paste" ? text.trim() : file)) missing.push("your resume (paste or upload)");
+    if (!jobDescription.trim()) missing.push("a job description");
+    if (missing.length > 0) {
+      setError(`Please add ${missing.join(" and ")} before checking your score.`);
       return;
     }
-    if (!(method === "paste" ? text.trim() : file)) {
-      setError("Please paste your resume or upload a PDF first.");
-      return;
-    }
+    const signal = nextCheckSignal();
     setLoading(true);
     setResult(null);
     try {
-      const res = await api.scoreAts({
-        jobDescription: jobDescription.trim(),
-        text: method === "paste" ? text.trim() : undefined,
-        file: method === "upload" ? file! : undefined,
-        includeRecruiterTake: wantRecruiterTake,
-      });
+      const res = await api.scoreAts(
+        {
+          jobDescription: jobDescription.trim(),
+          text: method === "paste" ? text.trim() : undefined,
+          file: method === "upload" ? file! : undefined,
+          includeRecruiterTake: wantRecruiterTake,
+        },
+        signal,
+      );
       setResult(res);
     } catch (err) {
+      // Superseded by a re-click while this was still in flight -- the
+      // newer call already owns loading/result state, so this stale one
+      // must not touch either.
+      if (isAbortError(err)) return;
       setError(friendlyError(err));
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }
 
@@ -63,46 +75,24 @@ export default function AtsScorePage() {
             <Alert kind="error">{error}</Alert>
           </div>
         )}
-        <TextArea
-          label="Job description"
-          value={jobDescription}
-          onChange={setJobDescription}
-          placeholder="Paste the full job posting here — the more complete it is, the more accurate the keyword match."
-          rows={7}
+        <ResumePicker
+          method={method}
+          onMethodChange={setMethod}
+          text={text}
+          onTextChange={setText}
+          file={file}
+          onFileChange={setFile}
+          label="Your resume"
         />
-        <div className="flex gap-2 my-4">
-          <button
-            onClick={() => setMethod("paste")}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium ${method === "paste" ? "bg-ri-accent text-white" : "border border-ri-border"}`}
-          >
-            Paste text
-          </button>
-          <button
-            onClick={() => setMethod("upload")}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium ${method === "upload" ? "bg-ri-accent text-white" : "border border-ri-border"}`}
-          >
-            Upload PDF
-          </button>
-        </div>
-        {method === "paste" ? (
+        <div className="mt-5">
           <TextArea
-            label="Paste resume"
-            value={text}
-            onChange={setText}
-            placeholder={"Skills:\nPython, Django\n\nExperience:\nBackend developer…"}
+            label="Job description"
+            value={jobDescription}
+            onChange={setJobDescription}
+            placeholder="Paste the full job posting here — the more complete it is, the more accurate the keyword match."
             rows={7}
           />
-        ) : (
-          <label className="block">
-            <span className="block text-sm font-medium mb-1.5">Upload resume PDF</span>
-            <input
-              type="file"
-              accept="application/pdf"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-              className="block w-full text-sm"
-            />
-          </label>
-        )}
+        </div>
         <label className="flex items-start gap-2 mt-4 text-sm">
           <input
             type="checkbox"
@@ -141,11 +131,11 @@ export default function AtsScorePage() {
           <div className="space-y-2 mb-5">
             {result.categories.map((cat) => (
               <div key={cat.key} className="flex items-center gap-3 text-sm">
-                <span className="w-48 shrink-0">{cat.label} ({cat.weight}%)</span>
+                <span className="w-28 sm:w-48 shrink-0">{cat.label} ({cat.weight}%)</span>
                 <div className="flex-1 h-2.5 rounded-full bg-ri-track overflow-hidden">
                   <div
                     className="h-full rounded-full"
-                    style={{ width: `${cat.score * 10}%`, background: scoreColor(cat.score) }}
+                    style={{ width: `${cat.score}%`, background: scoreColor(cat.score / 10) }}
                   />
                 </div>
                 <span className="w-8 text-right font-semibold">{cat.score.toFixed(0)}</span>
@@ -175,7 +165,7 @@ export default function AtsScorePage() {
           <div className="space-y-1.5 mb-5">
             {result.keyword_importance.slice(0, 12).map((kw, i) => (
               <div key={i} className="flex items-center gap-3 text-sm">
-                <span className={`w-40 shrink-0 truncate ${kw.matched ? "" : "text-ri-text-mute"}`}>
+                <span className={`w-24 sm:w-40 shrink-0 truncate ${kw.matched ? "" : "text-ri-text-mute"}`}>
                   {kw.matched ? "✅" : "❌"} {kw.keyword}
                 </span>
                 <div className="flex-1 h-2 rounded-full bg-ri-track overflow-hidden">

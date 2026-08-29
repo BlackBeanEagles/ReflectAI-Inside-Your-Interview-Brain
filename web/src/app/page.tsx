@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { friendlyError, useHealth } from "@/lib/hooks";
+import { friendlyError, isAbortError, useAbortSignal, useHealth } from "@/lib/hooks";
 import type { CleanedResume, EvaluateResponse, ReportResponse, VoiceAnalysis } from "@/lib/types";
 import {
   Alert,
@@ -17,6 +17,7 @@ import {
   TextArea,
 } from "@/components/ui";
 import ReportView from "@/components/ReportView";
+import { ResumePicker } from "@/components/ResumePicker";
 
 const MAX_QUESTIONS = 10;
 
@@ -125,6 +126,11 @@ function InterviewSessionInner() {
   const [reportError, setReportError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
+  const nextStartSignal = useAbortSignal();
+  const nextQuestionSignal = useAbortSignal();
+  const nextEvalSignal = useAbortSignal();
+  const nextReportSignal = useAbortSignal();
+
   // ── Setup: start interview ─────────────────────────────────────────────
   async function handleStart() {
     setSetupError(null);
@@ -133,6 +139,7 @@ function InterviewSessionInner() {
       setSetupError("Please paste your resume or upload a PDF first.");
       return;
     }
+    const signal = nextStartSignal();
     setSetupLoading(true);
     try {
       const langValue = language !== "English" ? language : null;
@@ -141,12 +148,16 @@ function InterviewSessionInner() {
       const { session_id } = await api.startSession(
         { store_consent: storeConsent, language: langValue },
         token,
+        signal,
       );
-      const { cleaned: cleanedData } = await api.parseResume({
-        text: resumeMethod === "paste" ? resumeText.trim() : undefined,
-        file: resumeMethod === "upload" ? resumeFile! : undefined,
-        sessionId: session_id,
-      });
+      const { cleaned: cleanedData } = await api.parseResume(
+        {
+          text: resumeMethod === "paste" ? resumeText.trim() : undefined,
+          file: resumeMethod === "upload" ? resumeFile! : undefined,
+          sessionId: session_id,
+        },
+        signal,
+      );
 
       setSessionId(session_id);
       setCleaned(cleanedData);
@@ -167,9 +178,10 @@ function InterviewSessionInner() {
         langOverride: langValue,
       });
     } catch (err) {
+      if (isAbortError(err)) return;
       setSetupError(friendlyError(err));
     } finally {
-      setSetupLoading(false);
+      if (!signal.aborted) setSetupLoading(false);
     }
   }
 
@@ -194,24 +206,28 @@ function InterviewSessionInner() {
     if (opts.langOverride !== undefined) langValueRef.current = opts.langOverride;
     if (!activeCleaned) return;
 
+    const signal = nextQuestionSignal();
     setNextLoading(true);
     setInterviewError(null);
     try {
-      const result = await api.nextQuestion({
-        count: opts.count,
-        skills: activeCleaned.skills,
-        projects: activeCleaned.projects,
-        experience: activeCleaned.experience,
-        used_skills: opts.used,
-        current_round: opts.round,
-        score_history: opts.scoreHist,
-        difficulty: opts.difficulty,
-        stress_count: opts.stressC,
-        max_questions: MAX_QUESTIONS,
-        session_id: activeSession || undefined,
-        role: roleValueRef.current,
-        language: langValueRef.current,
-      });
+      const result = await api.nextQuestion(
+        {
+          count: opts.count,
+          skills: activeCleaned.skills,
+          projects: activeCleaned.projects,
+          experience: activeCleaned.experience,
+          used_skills: opts.used,
+          current_round: opts.round,
+          score_history: opts.scoreHist,
+          difficulty: opts.difficulty,
+          stress_count: opts.stressC,
+          max_questions: MAX_QUESTIONS,
+          session_id: activeSession || undefined,
+          role: roleValueRef.current,
+          language: langValueRef.current,
+        },
+        signal,
+      );
 
       if (result.should_end) {
         setInterviewComplete(true);
@@ -260,9 +276,10 @@ function InterviewSessionInner() {
       setVoiceAnalysis(null);
       setAudioBlob(null);
     } catch (err) {
+      if (isAbortError(err)) return;
       setInterviewError(friendlyError(err));
     } finally {
-      setNextLoading(false);
+      if (!signal.aborted) setNextLoading(false);
     }
   }
 
@@ -317,16 +334,20 @@ function InterviewSessionInner() {
   // ── Evaluate answer ──────────────────────────────────────────────────────
   async function handleEvaluate() {
     if (!answer.trim() || !currentQuestion || !sessionId) return;
+    const signal = nextEvalSignal();
     setEvalLoading(true);
     setEvalError(null);
     try {
       const langValue = language !== "English" ? language : null;
-      const result = await api.evaluateAnswer({
-        question: currentQuestion,
-        answer: answer.trim(),
-        answer_type: round,
-        language: langValue,
-      });
+      const result = await api.evaluateAnswer(
+        {
+          question: currentQuestion,
+          answer: answer.trim(),
+          answer_type: round,
+          language: langValue,
+        },
+        signal,
+      );
       setEvalResult(result);
       setEvaluated(true);
 
@@ -352,9 +373,10 @@ function InterviewSessionInner() {
         }
       }
     } catch (err) {
+      if (isAbortError(err)) return;
       setEvalError(friendlyError(err));
     } finally {
-      setEvalLoading(false);
+      if (!signal.aborted) setEvalLoading(false);
     }
   }
 
@@ -382,16 +404,18 @@ function InterviewSessionInner() {
 
   async function handleGenerateReport() {
     if (!sessionId) return;
+    const signal = nextReportSignal();
     setReportLoading(true);
     setReportError(null);
     try {
-      const result = await api.generateReport(sessionId);
+      const result = await api.generateReport(sessionId, token, signal);
       setReport(result);
       setPhase("report");
     } catch (err) {
+      if (isAbortError(err)) return;
       setReportError(friendlyError(err));
     } finally {
-      setReportLoading(false);
+      if (!signal.aborted) setReportLoading(false);
     }
   }
 
@@ -474,7 +498,7 @@ function InterviewSessionInner() {
 
         {transitionMessage && (
           <Alert kind="info">
-            <span dangerouslySetInnerHTML={{ __html: transitionMessage }} />
+            <span>{transitionMessage}</span>
           </Alert>
         )}
 
@@ -623,40 +647,15 @@ function InterviewSessionInner() {
           </div>
         )}
 
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setResumeMethod("paste")}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium ${resumeMethod === "paste" ? "bg-ri-accent text-white" : "border border-ri-border"}`}
-          >
-            Paste text
-          </button>
-          <button
-            onClick={() => setResumeMethod("upload")}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium ${resumeMethod === "upload" ? "bg-ri-accent text-white" : "border border-ri-border"}`}
-          >
-            Upload PDF
-          </button>
-        </div>
-
-        {resumeMethod === "paste" ? (
-          <TextArea
-            label="Paste resume here"
-            value={resumeText}
-            onChange={setResumeText}
-            placeholder={"Skills:\nPython, Django, React\n\nProjects:\nChatbot using NLP\n\nExperience:\nInternship"}
-            rows={8}
-          />
-        ) : (
-          <label className="block">
-            <span className="block text-sm font-medium mb-1.5">Upload resume PDF</span>
-            <input
-              type="file"
-              accept="application/pdf"
-              onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
-              className="block w-full text-sm"
-            />
-          </label>
-        )}
+        <ResumePicker
+          method={resumeMethod}
+          onMethodChange={setResumeMethod}
+          text={resumeText}
+          onTextChange={setResumeText}
+          file={resumeFile}
+          onFileChange={setResumeFile}
+          label="Your resume"
+        />
 
         <div className="grid sm:grid-cols-2 gap-4 mt-5">
           <label className="block">

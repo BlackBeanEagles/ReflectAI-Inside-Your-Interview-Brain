@@ -57,11 +57,12 @@ async function request<T>(
   return res.json() as Promise<T>;
 }
 
-function jsonInit(body: unknown): RequestInit {
+function jsonInit(body: unknown, signal?: AbortSignal): RequestInit {
   return {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   };
 }
 
@@ -102,10 +103,11 @@ export function resetPassword(token: string, new_password: string): Promise<{ me
 export function startSession(
   opts: { store_consent?: boolean; language?: string | null } = {},
   authToken?: string | null,
+  signal?: AbortSignal,
 ): Promise<SessionStartResponse> {
   return request<SessionStartResponse>(
     "/session/start",
-    jsonInit({ store_consent: !!opts.store_consent, language: opts.language || null }),
+    jsonInit({ store_consent: !!opts.store_consent, language: opts.language || null }, signal),
     authToken,
   );
 }
@@ -126,8 +128,12 @@ export function addInteraction(payload: AddInteractionPayload): Promise<unknown>
   return request("/session/add-interaction", jsonInit(payload));
 }
 
-export function generateReport(sessionId: string): Promise<ReportResponse> {
-  return request<ReportResponse>(`/session/${sessionId}/report`, { method: "POST" });
+export function generateReport(
+  sessionId: string,
+  token?: string | null,
+  signal?: AbortSignal,
+): Promise<ReportResponse> {
+  return request<ReportResponse>(`/session/${sessionId}/report`, { method: "POST", signal }, token);
 }
 
 export async function downloadReportPdf(sessionId: string, token?: string | null): Promise<Blob> {
@@ -142,12 +148,13 @@ export async function downloadReportPdf(sessionId: string, token?: string | null
 
 export function parseResume(
   opts: { text?: string; file?: File; sessionId?: string },
+  signal?: AbortSignal,
 ): Promise<ResumeParseResponse> {
   const form = new FormData();
   if (opts.file) form.append("file", opts.file);
   else if (opts.text) form.append("text", opts.text);
   if (opts.sessionId) form.append("session_id", opts.sessionId);
-  return request<ResumeParseResponse>("/parse-resume", { method: "POST", body: form });
+  return request<ResumeParseResponse>("/parse-resume", { method: "POST", body: form, signal });
 }
 
 export interface NextQuestionPayload {
@@ -166,18 +173,21 @@ export interface NextQuestionPayload {
   language?: string | null;
 }
 
-export function nextQuestion(payload: NextQuestionPayload): Promise<NextQuestionResponse> {
-  return request<NextQuestionResponse>("/next-question", jsonInit(payload));
+export function nextQuestion(payload: NextQuestionPayload, signal?: AbortSignal): Promise<NextQuestionResponse> {
+  return request<NextQuestionResponse>("/next-question", jsonInit(payload, signal));
 }
 
-export function evaluateAnswer(payload: {
-  question: string;
-  answer: string;
-  answer_type: string;
-  coaching_hint?: string;
-  language?: string | null;
-}): Promise<EvaluateResponse> {
-  return request<EvaluateResponse>("/evaluate-answer", jsonInit(payload));
+export function evaluateAnswer(
+  payload: {
+    question: string;
+    answer: string;
+    answer_type: string;
+    coaching_hint?: string;
+    language?: string | null;
+  },
+  signal?: AbortSignal,
+): Promise<EvaluateResponse> {
+  return request<EvaluateResponse>("/evaluate-answer", jsonInit(payload, signal));
 }
 
 export function transcribeAudio(blob: Blob): Promise<TranscribeResponse> {
@@ -188,34 +198,40 @@ export function transcribeAudio(blob: Blob): Promise<TranscribeResponse> {
 
 // ─── ATS score ───────────────────────────────────────────────────────────
 
-export function scoreAts(opts: {
-  jobDescription: string;
-  text?: string;
-  file?: File;
-  includeRecruiterTake?: boolean;
-}): Promise<ATSScoreResponse> {
+export function scoreAts(
+  opts: {
+    jobDescription: string;
+    text?: string;
+    file?: File;
+    includeRecruiterTake?: boolean;
+  },
+  signal?: AbortSignal,
+): Promise<ATSScoreResponse> {
   const form = new FormData();
   form.append("job_description", opts.jobDescription);
   form.append("include_recruiter_take", String(!!opts.includeRecruiterTake));
   if (opts.file) form.append("file", opts.file);
   else if (opts.text) form.append("text", opts.text);
-  return request<ATSScoreResponse>("/ats-score", { method: "POST", body: form });
+  return request<ATSScoreResponse>("/ats-score", { method: "POST", body: form, signal });
 }
 
 // ─── Predicted questions ─────────────────────────────────────────────────
 
-export function predictQuestions(opts: {
-  text?: string;
-  file?: File;
-  role?: string;
-  jobDescription?: string;
-  count?: number;
-}): Promise<PredictQuestionsResponse> {
+export function predictQuestions(
+  opts: {
+    text?: string;
+    file?: File;
+    role?: string;
+    jobDescription?: string;
+    count?: number;
+  },
+  signal?: AbortSignal,
+): Promise<PredictQuestionsResponse> {
   const form = new FormData();
   if (opts.file) form.append("file", opts.file);
   else if (opts.text) form.append("text", opts.text);
   if (opts.role) form.append("role", opts.role);
   if (opts.jobDescription) form.append("job_description", opts.jobDescription);
   form.append("count", String(opts.count ?? 10));
-  return request<PredictQuestionsResponse>("/predict-questions", { method: "POST", body: form });
+  return request<PredictQuestionsResponse>("/predict-questions", { method: "POST", body: form, signal });
 }

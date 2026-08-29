@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import * as api from "@/lib/api";
-import { friendlyError, usePageTitle } from "@/lib/hooks";
+import { friendlyError, isAbortError, useAbortSignal, usePageTitle } from "@/lib/hooks";
 import { Alert, Card, PrimaryButton, TextArea, TextField } from "@/components/ui";
+import { ResumePicker } from "@/components/ResumePicker";
 import type { PredictedQuestionItem } from "@/lib/types";
 
 const CATEGORY_META: Record<string, { icon: string; label: string }> = {
@@ -23,6 +24,7 @@ export default function PredictedQuestionsPage() {
   const [questions, setQuestions] = useState<PredictedQuestionItem[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const nextPredictSignal = useAbortSignal();
 
   async function handlePredict() {
     setError(null);
@@ -31,25 +33,30 @@ export default function PredictedQuestionsPage() {
       setError("Add at least a resume, a target role, or a job description.");
       return;
     }
+    const signal = nextPredictSignal();
     setLoading(true);
     setQuestions(null);
     try {
-      const result = await api.predictQuestions({
-        text: method === "paste" ? text.trim() || undefined : undefined,
-        file: method === "upload" ? file || undefined : undefined,
-        role: role.trim() || undefined,
-        jobDescription: jobDescription.trim() || undefined,
-        count,
-      });
+      const result = await api.predictQuestions(
+        {
+          text: method === "paste" ? text.trim() || undefined : undefined,
+          file: method === "upload" ? file || undefined : undefined,
+          role: role.trim() || undefined,
+          jobDescription: jobDescription.trim() || undefined,
+          count,
+        },
+        signal,
+      );
       if (result.error) {
         setError(result.message || "Could not generate questions right now.");
       } else {
         setQuestions(result.questions);
       }
     } catch (err) {
+      if (isAbortError(err)) return;
       setError(friendlyError(err));
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }
 
@@ -91,39 +98,16 @@ export default function PredictedQuestionsPage() {
             placeholder="Paste a job posting to bias questions toward what this specific role needs."
             rows={4}
           />
-          <div className="flex gap-2">
-            <button
-              onClick={() => setMethod("paste")}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium ${method === "paste" ? "bg-ri-accent text-white" : "border border-ri-border"}`}
-            >
-              Paste text
-            </button>
-            <button
-              onClick={() => setMethod("upload")}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium ${method === "upload" ? "bg-ri-accent text-white" : "border border-ri-border"}`}
-            >
-              Upload PDF
-            </button>
-          </div>
-          {method === "paste" ? (
-            <TextArea
-              label="Paste resume (optional)"
-              value={text}
-              onChange={setText}
-              placeholder={"Skills:\nPython, Django\n\nProjects:\nChatbot using NLP"}
-              rows={5}
-            />
-          ) : (
-            <label className="block">
-              <span className="block text-sm font-medium mb-1.5">Upload resume PDF (optional)</span>
-              <input
-                type="file"
-                accept="application/pdf"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                className="block w-full text-sm"
-              />
-            </label>
-          )}
+          <ResumePicker
+            method={method}
+            onMethodChange={setMethod}
+            text={text}
+            onTextChange={setText}
+            file={file}
+            onFileChange={setFile}
+            label="Resume"
+            optional
+          />
           <label className="block">
             <span className="block text-sm font-medium mb-1.5">How many questions? ({count})</span>
             <input

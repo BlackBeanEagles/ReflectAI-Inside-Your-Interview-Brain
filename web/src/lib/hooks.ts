@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getHealth } from "./api";
 import type { HealthResponse } from "./types";
 import { ApiError } from "./api";
@@ -38,6 +38,35 @@ export function friendlyError(err: unknown): string {
   if (err instanceof TypeError) return "Cannot connect to the backend. Please try again.";
   if (err instanceof Error) return err.message;
   return "Something went wrong. Please try again.";
+}
+
+/** One logical async action (e.g. "submit this form") that can be
+ * re-triggered before its previous call finished -- a slow network plus an
+ * impatient re-click, a stale response resolving after the user has already
+ * moved on. Call the returned function right before starting a new request:
+ * it aborts whatever this same action still had in flight and returns a
+ * fresh AbortSignal for the new one, so an old response can never overwrite
+ * a newer one. Also aborts on unmount. Pass the signal to the api.* call,
+ * and in the catch block bail out early via isAbortError(err) -- a request
+ * that lost the race isn't a real error, so it shouldn't set error state or
+ * (in a finally block) clear a loading flag that the newer request owns. */
+export function useAbortSignal() {
+  const controllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => controllerRef.current?.abort();
+  }, []);
+
+  return () => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    return controller.signal;
+  };
+}
+
+export function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
 }
 
 /** Polls /health once on mount -- mirrors the status dot in the Streamlit
