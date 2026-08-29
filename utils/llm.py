@@ -225,16 +225,32 @@ def _call_groq(prompt: str, purpose: str, timeout: int) -> Dict:
         )}
 
     profile = PROFILES.get(purpose, PROFILES["default"])
+    is_reasoning_model = GROQ_MODEL.startswith("openai/gpt-oss")
     try:
+        max_tokens = profile.get("num_predict", 300)
+        if is_reasoning_model:
+            # gpt-oss models spend part of max_tokens on invisible reasoning
+            # tokens before the visible answer. The profiles above size
+            # max_tokens for a plain chat model's *visible* output only
+            # (e.g. "question" is capped at 100 for a one-sentence prompt) --
+            # without headroom, reasoning alone can eat the whole budget on
+            # these short prompts and leave `content` empty.
+            max_tokens += 150
         payload = {
             "model": GROQ_MODEL,
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": profile.get("num_predict", 300),
+            "max_tokens": max_tokens,
             "temperature": profile.get("temperature", 0.6),
             "top_p": profile.get("top_p", 0.9),
         }
         if profile.get("stop"):
             payload["stop"] = profile["stop"][:4]  # Groq caps stop sequences at 4
+        if is_reasoning_model:
+            # "low" keeps the reasoning pass itself short too, on top of the
+            # extra token headroom above -- both matter: low effort alone
+            # can still occasionally run long, and headroom alone doesn't
+            # help if the model reasons for hundreds of tokens regardless.
+            payload["reasoning_effort"] = "low"
 
         response = _session.post(
             GROQ_URL,
