@@ -55,7 +55,13 @@ NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "2048"))
 # ── Groq config (free hosted inference) ───────────────────────────────────────
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+# llama-3.1-8b-instant (the previous default) was deprecated by Groq on
+# 2026-06-17 for free/developer-tier usage -- requests now 404 with
+# "model_not_found". openai/gpt-oss-20b is Groq's own recommended
+# replacement (see https://console.groq.com/docs/deprecations). If Groq
+# deprecates this one too, override via GROQ_MODEL rather than waiting on
+# a code change -- see .env.example.
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 
 # Model name surfaced to /health and the frontend status strip, regardless of
 # which provider is active.
