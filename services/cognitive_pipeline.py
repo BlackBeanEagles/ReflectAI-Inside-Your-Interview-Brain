@@ -106,10 +106,7 @@ def impulsivity_from_signals(
         else:
             category = "medium"
 
-    if pattern != "mixed":
-        imp_score = round(raw, 2)
-    else:
-        imp_score = round(raw, 2)
+    imp_score = round(raw, 2)
 
     return {
         "impulsivity_score": imp_score,

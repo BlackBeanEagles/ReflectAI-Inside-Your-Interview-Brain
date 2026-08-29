@@ -217,9 +217,10 @@ def run_interview_step(
             question_type = stress_result.get("question_type", "rapid")
         else:
             # Filter out already-used skills for variety
+            used_lower = {u.lower() for u in used_skills}
             available_skills = [
                 s for s in cleaned_data.get("skills", [])
-                if s.lower() not in [u.lower() for u in used_skills]
+                if s.lower() not in used_lower
             ] or cleaned_data.get("skills", [])  # fallback if all used
 
             question = generate_technical_question(

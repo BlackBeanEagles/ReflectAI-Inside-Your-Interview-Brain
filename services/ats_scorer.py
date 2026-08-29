@@ -248,11 +248,11 @@ def _score_experience_relevance(resume_text: str) -> Tuple[float, List[Dict]]:
     bullet_like = [l for l in lines if _BULLET_LINE_RE.match(l)]
     bullet_like = bullet_like or lines
     quantified = [l for l in bullet_like if _QUANTIFIED_RE.search(l)]
-    action_started = [
-        l for l in bullet_like
-        if re.match(r"^\s*[•\-\*·▪▸]?\s*(\w+)", l)
-        and re.match(r"^\s*[•\-\*·▪▸]?\s*(\w+)", l).group(1).lower() in _ACTION_VERBS
-    ]
+    action_started = []
+    for l in bullet_like:
+        m = re.match(r"^\s*[•\-\*·▪▸]?\s*(\w+)", l)
+        if m and m.group(1).lower() in _ACTION_VERBS:
+            action_started.append(l)
 
     quantified_ratio = len(quantified) / len(bullet_like) if bullet_like else 0.0
     action_ratio = len(action_started) / len(bullet_like) if bullet_like else 0.0
