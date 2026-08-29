@@ -147,7 +147,7 @@ export default function ResumeAnalysisPage() {
       {loading && <Spinner label="Parsing resume…" />}
 
       {cleaned && (
-        <Card>
+        <Card className="ri-fade-in">
           <h2 className="font-bold mb-3">Extracted data</h2>
           <div className="grid sm:grid-cols-3 gap-4 text-sm">
             <div>
@@ -177,7 +177,7 @@ export default function ResumeAnalysisPage() {
       )}
 
       {question && (
-        <Card>
+        <Card className="ri-fade-in">
           <div className="p-4 rounded-lg border-l-4 border-ri-tech bg-ri-surface-alt text-base">
             {question}
           </div>

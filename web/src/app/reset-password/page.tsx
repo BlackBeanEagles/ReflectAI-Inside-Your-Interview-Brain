@@ -50,41 +50,43 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="max-w-sm mx-auto mt-8">
-      <Card>
-        <h1 className="text-xl font-bold mb-1">🔑 Set a new password</h1>
-        <p className="text-sm text-ri-text-mute mb-5">
-          This link is single-use and expires 1 hour after it was requested.
-        </p>
-        {!token && (
-          <div className="mb-4">
-            <Alert kind="error">No reset token found in this link.</Alert>
-          </div>
-        )}
-        {error && (
-          <div className="mb-4">
-            <Alert kind="error">{error}</Alert>
-          </div>
-        )}
-        {message ? (
-          <>
-            <Alert kind="success">{message}</Alert>
-            <div className="mt-4 text-sm text-center">
-              <Link href="/login" className="text-ri-accent hover:underline">
-                Go to log in
-              </Link>
+    <div className="min-h-[70vh] flex items-center justify-center">
+      <div className="max-w-sm w-full ri-fade-in">
+        <Card>
+          <h1 className="text-xl font-bold mb-1">🔑 Set a new password</h1>
+          <p className="text-sm text-ri-text-mute mb-5">
+            This link is single-use and expires 1 hour after it was requested.
+          </p>
+          {!token && (
+            <div className="mb-4">
+              <Alert kind="error">No reset token found in this link.</Alert>
             </div>
-          </>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <TextField label="New password" value={password} onChange={setPassword} type="password" />
-            <TextField label="Confirm new password" value={confirm} onChange={setConfirm} type="password" />
-            <PrimaryButton type="submit" disabled={loading || !token} className="w-full">
-              {loading ? "Updating…" : "Update password"}
-            </PrimaryButton>
-          </form>
-        )}
-      </Card>
+          )}
+          {error && (
+            <div className="mb-4">
+              <Alert kind="error">{error}</Alert>
+            </div>
+          )}
+          {message ? (
+            <>
+              <Alert kind="success">{message}</Alert>
+              <div className="mt-4 text-sm text-center">
+                <Link href="/login" className="text-ri-accent hover:underline">
+                  Go to log in
+                </Link>
+              </div>
+            </>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <TextField label="New password" value={password} onChange={setPassword} type="password" />
+              <TextField label="Confirm new password" value={confirm} onChange={setConfirm} type="password" />
+              <PrimaryButton type="submit" disabled={loading || !token} className="w-full">
+                {loading ? "Updating…" : "Update password"}
+              </PrimaryButton>
+            </form>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

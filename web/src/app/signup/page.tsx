@@ -45,34 +45,36 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="max-w-sm mx-auto mt-8">
-      <Card>
-        <h1 className="text-xl font-bold mb-1">Sign up</h1>
-        <p className="text-sm text-ri-text-mute mb-5">
-          Optional — everything works fine without an account too.
-        </p>
-        {error && (
-          <div className="mb-4">
-            <Alert kind="error">{error}</Alert>
+    <div className="min-h-[70vh] flex items-center justify-center">
+      <div className="max-w-sm w-full ri-fade-in">
+        <Card>
+          <h1 className="text-xl font-bold mb-1">Sign up</h1>
+          <p className="text-sm text-ri-text-mute mb-5">
+            Optional — everything works fine without an account too.
+          </p>
+          {error && (
+            <div className="mb-4">
+              <Alert kind="error">{error}</Alert>
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <TextField label="Email" value={email} onChange={setEmail} type="email" />
+            <TextField label="Password" value={password} onChange={setPassword} type="password"
+              help="At least 8 characters." />
+            <TextField label="Confirm password" value={confirm} onChange={setConfirm} type="password" />
+            <TextField label="Name (optional)" value={name} onChange={setName} />
+            <PrimaryButton type="submit" disabled={loading} className="w-full">
+              {loading ? "Creating account…" : "Sign up"}
+            </PrimaryButton>
+          </form>
+          <div className="mt-4 text-sm text-center">
+            Already have an account?{" "}
+            <Link href="/login" className="text-ri-accent hover:underline">
+              Log in
+            </Link>
           </div>
-        )}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <TextField label="Email" value={email} onChange={setEmail} type="email" />
-          <TextField label="Password" value={password} onChange={setPassword} type="password"
-            help="At least 8 characters." />
-          <TextField label="Confirm password" value={confirm} onChange={setConfirm} type="password" />
-          <TextField label="Name (optional)" value={name} onChange={setName} />
-          <PrimaryButton type="submit" disabled={loading} className="w-full">
-            {loading ? "Creating account…" : "Sign up"}
-          </PrimaryButton>
-        </form>
-        <div className="mt-4 text-sm text-center">
-          Already have an account?{" "}
-          <Link href="/login" className="text-ri-accent hover:underline">
-            Log in
-          </Link>
-        </div>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

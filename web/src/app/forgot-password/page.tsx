@@ -33,34 +33,36 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="max-w-sm mx-auto mt-8">
-      <Card>
-        <h1 className="text-xl font-bold mb-1">Forgot password?</h1>
-        <p className="text-sm text-ri-text-mute mb-5">
-          If an account exists for that email, a reset link is sent to it.
-        </p>
-        {error && (
-          <div className="mb-4">
-            <Alert kind="error">{error}</Alert>
+    <div className="min-h-[70vh] flex items-center justify-center">
+      <div className="max-w-sm w-full ri-fade-in">
+        <Card>
+          <h1 className="text-xl font-bold mb-1">Forgot password?</h1>
+          <p className="text-sm text-ri-text-mute mb-5">
+            If an account exists for that email, a reset link is sent to it.
+          </p>
+          {error && (
+            <div className="mb-4">
+              <Alert kind="error">{error}</Alert>
+            </div>
+          )}
+          {message && (
+            <div className="mb-4">
+              <Alert kind="success">{message}</Alert>
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <TextField label="Email" value={email} onChange={setEmail} type="email" />
+            <PrimaryButton type="submit" disabled={loading} className="w-full">
+              {loading ? "Sending…" : "Send reset link"}
+            </PrimaryButton>
+          </form>
+          <div className="mt-4 text-sm text-center">
+            <Link href="/login" className="text-ri-accent hover:underline">
+              Back to log in
+            </Link>
           </div>
-        )}
-        {message && (
-          <div className="mb-4">
-            <Alert kind="success">{message}</Alert>
-          </div>
-        )}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <TextField label="Email" value={email} onChange={setEmail} type="email" />
-          <PrimaryButton type="submit" disabled={loading} className="w-full">
-            {loading ? "Sending…" : "Send reset link"}
-          </PrimaryButton>
-        </form>
-        <div className="mt-4 text-sm text-center">
-          <Link href="/login" className="text-ri-accent hover:underline">
-            Back to log in
-          </Link>
-        </div>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -5,6 +5,10 @@
    as variables and re-pointed for dark mode via :root[data-theme] and the
    OS-level media query, so every component stays readable either way. */
 :root {
+  /* Page background is deliberately a shade off from card surfaces below --
+     without that gap, a "card" is only a 1px border away from the page
+     it's sitting on and the whole UI reads flat. */
+  --ri-page-bg: #eef1f8;
   --ri-surface: #ffffff;
   --ri-surface-alt: #f8faff;
   --ri-surface-mute: #f5f5f9;
@@ -12,6 +16,7 @@
   --ri-text: #1a1a2e;
   --ri-text-mute: #666a75;
   --ri-track: #e8eaf0;
+  --ri-card-shadow: 0 1px 2px rgba(30, 41, 82, 0.04), 0 6px 16px rgba(30, 41, 82, 0.06);
 
   --ri-accent: #4f6ef7;
   --ri-tech: #e86a2d;
@@ -32,12 +37,15 @@
   --ri-chip-bg: #e8eeff;
   --ri-chip-fg: #2d3a8c;
 
-  --background: var(--ri-surface);
+  --background: var(--ri-page-bg);
   --foreground: var(--ri-text);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    /* Same reasoning as the light palette above, inverted: the page sits a
+       shade darker than card surfaces, so surfaces read as "lifted." */
+    --ri-page-bg: #0d0f16;
     --ri-surface: #171a24;
     --ri-surface-alt: #1b1f2c;
     --ri-surface-mute: #1e222e;
@@ -45,6 +53,7 @@
     --ri-text: #e8ebf5;
     --ri-text-mute: #9aa2b8;
     --ri-track: #2a2f3d;
+    --ri-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
 
     --ri-good-bg: #12301f;
     --ri-good-fg: #8ee6b0;
@@ -61,7 +70,7 @@
     --ri-chip-bg: #212844;
     --ri-chip-fg: #b6c2ff;
 
-    --background: var(--ri-surface);
+    --background: var(--ri-page-bg);
     --foreground: var(--ri-text);
   }
 }

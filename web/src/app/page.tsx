@@ -464,7 +464,7 @@ function InterviewSessionInner() {
   // ── Render: report phase ────────────────────────────────────────────────
   if (phase === "report" && report) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 ri-fade-in">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h1 className="text-2xl font-extrabold">Final Report</h1>
           <div className="flex gap-2">
@@ -485,7 +485,7 @@ function InterviewSessionInner() {
   // ── Render: interview phase ─────────────────────────────────────────────
   if (phase === "interview") {
     return (
-      <div className="space-y-5">
+      <div className="space-y-5 ri-fade-in">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold">Question {count}</h1>
@@ -526,7 +526,7 @@ function InterviewSessionInner() {
             <Spinner label="Generating question… (first one takes longest while the model warms up)" />
           </Card>
         ) : currentQuestion ? (
-          <Card>
+          <Card key={count} className="ri-fade-in">
             <RoundBadge round={round} />
             <div
               className={`mt-3 p-4 rounded-lg border-l-4 text-base leading-relaxed ${
@@ -621,7 +621,7 @@ function InterviewSessionInner() {
 
   // ── Render: setup phase ─────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 ri-fade-in">
       <div className="text-center py-4">
         <h1 className="text-4xl font-extrabold ri-hero-title mb-3">
           Practice the interview before it counts
@@ -634,10 +634,10 @@ function InterviewSessionInner() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <FeatureCard icon="💬" title="HR round" desc="2 warm-up behavioural questions" />
-        <FeatureCard icon="🛠️" title="Technical round" desc="Adaptive difficulty from your resume" />
-        <FeatureCard icon="🔥" title="Stress round" desc="Rapid-fire if scores dip" />
-        <FeatureCard icon="📊" title="Final report" desc="Scores, patterns, cognitive profile" />
+        <FeatureCard icon="💬" title="HR round" desc="2 warm-up behavioural questions" tone="info" />
+        <FeatureCard icon="🛠️" title="Technical round" desc="Adaptive difficulty from your resume" tone="warn" />
+        <FeatureCard icon="🔥" title="Stress round" desc="Rapid-fire if scores dip" tone="purple" />
+        <FeatureCard icon="📊" title="Final report" desc="Scores, patterns, cognitive profile" tone="good" />
       </div>
 
       <Card>
@@ -709,12 +709,31 @@ function InterviewSessionInner() {
   );
 }
 
-function FeatureCard({ icon, title, desc }: { icon: string; title: string; desc: string }) {
+const FEATURE_TONE_STYLES: Record<string, string> = {
+  info: "bg-ri-info-bg text-ri-info-fg",
+  warn: "bg-ri-warn-bg text-ri-warn-fg",
+  purple: "bg-ri-purple-bg text-ri-purple-fg",
+  good: "bg-ri-good-bg text-ri-good-fg",
+};
+
+function FeatureCard({
+  icon,
+  title,
+  desc,
+  tone,
+}: {
+  icon: string;
+  title: string;
+  desc: string;
+  tone: "info" | "warn" | "purple" | "good";
+}) {
   return (
-    <div className="bg-ri-surface-alt border border-ri-border rounded-xl p-3">
-      <div className="text-xl mb-1">{icon}</div>
+    <div className="bg-ri-surface-alt border border-ri-border rounded-xl p-4 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[var(--ri-card-shadow)]">
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-lg mb-2.5 ${FEATURE_TONE_STYLES[tone]}`}>
+        {icon}
+      </div>
       <div className="font-bold text-sm">{title}</div>
-      <div className="text-xs text-ri-text-mute">{desc}</div>
+      <div className="text-xs text-ri-text-mute mt-0.5">{desc}</div>
     </div>
   );
 }

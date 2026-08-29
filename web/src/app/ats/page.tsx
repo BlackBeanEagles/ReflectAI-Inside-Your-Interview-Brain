@@ -117,7 +117,7 @@ export default function AtsScorePage() {
       </Card>
 
       {result && (
-        <Card>
+        <Card className="ri-fade-in">
           <div className="text-center mb-5">
             <div className="text-5xl font-extrabold" style={{ color: scoreColor(result.overall_score / 10) }}>
               {result.overall_score.toFixed(0)}

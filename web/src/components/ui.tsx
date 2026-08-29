@@ -37,7 +37,9 @@ export function RoundBadge({ round }: { round: string }) {
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-ri-surface border border-ri-border rounded-xl p-5 ${className}`}>
+    <div
+      className={`bg-ri-surface border border-ri-border rounded-xl p-5 shadow-[var(--ri-card-shadow)] ${className}`}
+    >
       {children}
     </div>
   );
@@ -63,7 +65,10 @@ export function PrimaryButton({
       disabled={disabled}
       className={`px-4 py-2.5 rounded-lg font-semibold text-white bg-ri-accent hover:opacity-90
         disabled:opacity-50 disabled:cursor-not-allowed transition-all
-        hover:-translate-y-0.5 active:translate-y-0 ${className}`}
+        hover:-translate-y-0.5 active:translate-y-0
+        shadow-[0_2px_10px_rgba(79,110,247,0.35)] hover:shadow-[0_4px_16px_rgba(79,110,247,0.45)]
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ri-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ri-surface
+        disabled:shadow-none disabled:hover:translate-y-0 ${className}`}
     >
       {children}
     </button>
@@ -87,7 +92,8 @@ export function SecondaryButton({
       onClick={onClick}
       disabled={disabled}
       className={`px-4 py-2.5 rounded-lg font-semibold border border-ri-border
-        hover:bg-ri-surface-alt disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${className}`}
+        hover:bg-ri-surface-alt disabled:opacity-50 disabled:cursor-not-allowed transition-colors
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ri-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ri-surface ${className}`}
     >
       {children}
     </button>
