@@ -607,6 +607,32 @@ body {
   );
 }
 
+/* A soft floor of page-background behind a block of text, so body copy
+   stays readable wherever the ambient field happens to be brightest.
+   The field is at its most saturated in dark mode, and muted text over a
+   hot patch of it drops well below a usable contrast ratio -- but dimming
+   the whole field to fix one paragraph would throw away the colour
+   everywhere it is not a problem. This scrims only where text actually
+   sits, and fades out well before the block edges so there is no visible
+   rectangle. */
+.ri-legible {
+  position: relative;
+  isolation: isolate;
+}
+.ri-legible::before {
+  content: "";
+  position: absolute;
+  inset: -10% -14%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    58% 58% at 50% 50%,
+    color-mix(in srgb, var(--ri-page-bg) 82%, transparent) 0%,
+    color-mix(in srgb, var(--ri-page-bg) 55%, transparent) 45%,
+    color-mix(in srgb, var(--ri-page-bg) 0%, transparent) 78%
+  );
+}
+
 /* Card that lifts and warms on hover. */
 .ri-lift {
   transition:

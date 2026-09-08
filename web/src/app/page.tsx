@@ -669,7 +669,7 @@ function InterviewSessionInner() {
   // ── Render: setup phase ─────────────────────────────────────────────────
   return (
     <div className="space-y-7 ri-fade-in">
-      <div className="py-6 text-center sm:py-10">
+      <div className="ri-legible py-6 text-center sm:py-10">
         <span className="ri-rise mb-5 inline-flex items-center gap-2 rounded-full border border-ri-border bg-ri-surface/60 px-3.5 py-1.5 text-xs font-medium text-ri-text-mute backdrop-blur-sm">
           <span
             className="inline-block h-1.5 w-1.5 rounded-full"
