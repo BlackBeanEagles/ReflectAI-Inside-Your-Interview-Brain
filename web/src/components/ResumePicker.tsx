@@ -11,6 +11,7 @@ import { useState } from "react";
 import { FileText, Paperclip, Upload, X } from "lucide-react";
 import { TextArea } from "./ui";
 import { useSharedResume, type SharedResume } from "@/lib/resume-context";
+import { SAMPLE_RESUMES } from "@/lib/sample-resumes";
 
 function describeResume(r: SharedResume): string {
   if (r.method === "upload" && r.file) return r.file.name;
@@ -27,6 +28,7 @@ export function ResumePicker({
   onFileChange,
   label = "Resume",
   optional = false,
+  onSample,
 }: {
   method: "paste" | "upload";
   onMethodChange: (m: "paste" | "upload") => void;
@@ -36,6 +38,10 @@ export function ResumePicker({
   onFileChange: (f: File | null) => void;
   label?: string;
   optional?: boolean;
+  /** Called with the sample's suggested role when one is loaded, so a page
+   *  with a role selector can move it to match instead of leaving it on
+   *  "None" while the resume says otherwise. */
+  onSample?: (role: string) => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
   const { lastResume, saveResume } = useSharedResume();
@@ -82,6 +88,32 @@ export function ResumePicker({
           <span className="shrink-0 text-xs font-semibold underline">Use this</span>
         </button>
       )}
+      {/* Pasting a resume is the only gate in front of every feature here, so
+          a visitor with nothing to hand cannot try anything at all. These load
+          a realistic one in a click. Hidden once the field has content -- past
+          that point they are just clutter over the thing you already typed. */}
+      {!hasCurrentValue && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <span className="mr-0.5 text-xs text-ri-text-mute">No resume handy?</span>
+          {SAMPLE_RESUMES.map((sample) => (
+            <button
+              key={sample.id}
+              type="button"
+              onClick={() => {
+                onMethodChange("paste");
+                handleTextChange(sample.text);
+                onSample?.(sample.role);
+              }}
+              className="ri-focus rounded-full border border-ri-border bg-ri-surface-alt px-2.5 py-1
+                text-xs font-medium text-ri-text-mute transition-colors
+                hover:border-ri-accent/40 hover:bg-ri-accent-soft hover:text-ri-accent"
+            >
+              {sample.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* A segmented control rather than two loose buttons: these are two
           states of one choice, so they should share an enclosure. */}
       <div

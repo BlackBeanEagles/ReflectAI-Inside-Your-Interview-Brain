@@ -22,6 +22,7 @@ import {
 } from "@/components/ui";
 import ReportView from "@/components/ReportView";
 import { ResumePicker } from "@/components/ResumePicker";
+import RoundExplorer from "@/components/RoundExplorer";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
@@ -706,12 +707,7 @@ function InterviewSessionInner() {
         </p>
       </div>
 
-      <dl className="ri-stagger grid gap-x-8 gap-y-5 border-y border-ri-border py-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Stage n="01" title="HR round" desc="Two behavioural questions to open." />
-        <Stage n="02" title="Technical round" desc="Difficulty adapts to how you answer." />
-        <Stage n="03" title="Stress round" desc="Rapid-fire, only if your scores dip." />
-        <Stage n="04" title="Report" desc="Scores, recurring patterns, next steps." />
-      </dl>
+      <RoundExplorer />
 
       <Card>
         <CardBody>
@@ -729,6 +725,9 @@ function InterviewSessionInner() {
           file={resumeFile}
           onFileChange={setResumeFile}
           label="Your resume"
+          onSample={(sampleRole) => {
+            if (ROLE_PRESETS.includes(sampleRole)) setRole(sampleRole);
+          }}
         />
 
         <div className="grid sm:grid-cols-2 gap-4 mt-5">
@@ -782,22 +781,6 @@ function InterviewSessionInner() {
         </div>
         </CardBody>
       </Card>
-    </div>
-  );
-}
-
-/** One stage of the interview, as a numbered definition-list entry rather
- *  than a card. Four boxed cards in a row is the default shape for this kind
- *  of content and reads as filler; a rule with numbered items reads as a
- *  sequence, which is what the four stages actually are. */
-function Stage({ n, title, desc }: { n: string; title: string; desc: string }) {
-  return (
-    <div>
-      <dt className="flex items-baseline gap-2">
-        <span className="text-xs font-medium tabular-nums text-ri-text-mute">{n}</span>
-        <span className="ri-title text-[15px]">{title}</span>
-      </dt>
-      <dd className="mt-1 text-sm leading-relaxed text-ri-text-mute">{desc}</dd>
     </div>
   );
 }

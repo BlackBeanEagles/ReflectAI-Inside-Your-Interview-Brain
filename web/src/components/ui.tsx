@@ -42,7 +42,7 @@ export function ScorePanel({
   const offset = len * (1 - pct);
 
   return (
-    <div className="min-w-[104px] flex-1 rounded-lg border border-ri-border bg-ri-surface p-3 text-center">
+    <div className="min-w-[104px] flex-1 rounded-lg border border-ri-border bg-ri-surface p-3 text-center transition-shadow duration-200 hover:shadow-[var(--ri-shadow-lift)]">
       <div className="relative mx-auto" style={{ width: box, height: box }}>
         <svg width={box} height={box} viewBox={`0 0 ${box} ${box}`} className="-rotate-90">
           <circle cx={box / 2} cy={box / 2} r={r} fill="none" stroke="var(--ri-track)" strokeWidth={stroke} />
@@ -136,9 +136,14 @@ export function CardBody({
   return <div className={`p-5 ${className}`}>{children}</div>;
 }
 
+// active:scale is the cheapest honest affordance there is: a control that
+// visibly responds to being pressed feels responsive even when the work behind
+// it takes two seconds. transition covers transform too, so the release eases
+// back rather than snapping.
 const BTN_BASE =
   "ri-focus inline-flex items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium " +
-  "transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50";
+  "transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed " +
+  "disabled:opacity-50 disabled:active:scale-100";
 
 export function PrimaryButton({
   children,
@@ -160,7 +165,7 @@ export function PrimaryButton({
       disabled={disabled}
       // min-h-10 rather than vertical padding: buttons keep a consistent
       // 40px hit target whether their label wraps or not.
-      className={`${BTN_BASE} min-h-10 bg-ri-accent py-2 text-white hover:bg-[var(--ri-accent-hover)] ${className}`}
+      className={`${BTN_BASE} min-h-10 bg-ri-accent py-2 text-white shadow-[var(--ri-shadow)] hover:bg-[var(--ri-accent-hover)] hover:shadow-[var(--ri-shadow-lift)] disabled:shadow-none ${className}`}
     >
       {children}
     </button>
