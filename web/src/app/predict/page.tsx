@@ -8,9 +8,9 @@ import { ResumePicker } from "@/components/ResumePicker";
 import type { PredictedQuestionItem } from "@/lib/types";
 
 const CATEGORY_META: Record<string, { icon: string; label: string }> = {
-  technical: { icon: "🛠️", label: "Technical" },
-  hr: { icon: "💬", label: "HR" },
-  behavioral: { icon: "🧭", label: "Behavioral" },
+  technical: { icon: "", label: "Technical" },
+  hr: { icon: "", label: "HR" },
+  behavioral: { icon: "", label: "Behavioral" },
 };
 
 export default function PredictedQuestionsPage() {
@@ -70,11 +70,8 @@ export default function PredictedQuestionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-extrabold mb-1">
-          <span aria-hidden>🔮</span>{" "}
-          <span className="ri-hero-title">Predicted Interview Questions</span>
-        </h1>
-        <p className="text-ri-text-mute text-sm">
+        <h1 className="ri-display text-3xl">Predicted Interview Questions</h1>
+        <p className="ri-prose mt-2 text-ri-text-mute text-sm">
           Get a list of interview questions you should prepare for, generated from your resume
           and/or a target role or job description. This is a <b>study tool</b> — a prep list to
           read through, separate from the live adaptive mock interview in the first tab.
@@ -123,7 +120,7 @@ export default function PredictedQuestionsPage() {
             />
           </label>
           <PrimaryButton onClick={handlePredict} disabled={loading} className="w-full">
-            {loading ? "Generating likely interview questions…" : "🔮 Predict Questions"}
+            {loading ? "Generating likely interview questions…" : "Predict Questions"}
           </PrimaryButton>
         </div>
       </Card>
@@ -143,7 +140,7 @@ export default function PredictedQuestionsPage() {
                   {items.map((q, i) => (
                     <li key={i} className="bg-ri-purple-bg border border-ri-purple-line rounded-lg px-3 py-2.5 text-sm">
                       <b>{q.question}</b>
-                      <div className="text-xs opacity-80 mt-1">💡 {q.prep_tip}</div>
+                      <div className="text-xs opacity-80 mt-1">{q.prep_tip}</div>
                     </li>
                   ))}
                 </ul>

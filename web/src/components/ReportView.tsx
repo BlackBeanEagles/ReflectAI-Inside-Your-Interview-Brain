@@ -36,7 +36,7 @@ export default function ReportView({ report }: { report: ReportResponse }) {
       {/* ── Comparison to own past sessions ── */}
       {comparison && (
         <section>
-          <h3 className="font-bold text-sm mb-3">📈 Compared to your past sessions</h3>
+          <h3 className="font-bold text-sm mb-3">Compared to your past sessions</h3>
           <div className="flex gap-3 flex-wrap">
             {Object.entries(comparison).map(([field, data]) => {
               const up = data.delta > 0;
@@ -50,7 +50,7 @@ export default function ReportView({ report }: { report: ReportResponse }) {
                     className="text-xl font-extrabold"
                     style={{ color: flat ? "var(--ri-text-mute)" : up ? "var(--ri-good-line)" : "var(--ri-stress)" }}
                   >
-                    {flat ? "➡️" : up ? "🔼" : "🔽"} {data.delta > 0 ? "+" : ""}
+                    {flat ? "" : up ? "" : ""} {data.delta > 0 ? "+" : ""}
                     {data.delta.toFixed(1)}
                   </div>
                   <div className="text-xs text-ri-text-mute uppercase tracking-wide font-semibold mt-1">
@@ -69,7 +69,7 @@ export default function ReportView({ report }: { report: ReportResponse }) {
       {/* ── Voice & delivery ── */}
       {voice && (
         <section>
-          <h3 className="font-bold text-sm mb-3">🎙️ Voice & Delivery</h3>
+          <h3 className="font-bold text-sm mb-3">Voice & Delivery</h3>
           <p className="text-xs text-ri-text-mute mb-3">
             Based on {voice.voiced_answer_count} voice-recorded answer{voice.voiced_answer_count !== 1 ? "s" : ""} in this session.
           </p>
@@ -109,7 +109,7 @@ export default function ReportView({ report }: { report: ReportResponse }) {
       {/* ── Behavioural analysis ── */}
       {(report.consistency || report.pressure_performance || report.behavior_summary || report.behavior_tags.length > 0) && (
         <section>
-          <h3 className="font-bold text-sm mb-3">🧠 Behavioural Analysis</h3>
+          <h3 className="font-bold text-sm mb-3">Behavioural Analysis</h3>
           {report.behavior_tags.length > 0 && (
             <div className="flex gap-2 flex-wrap mb-3">
               {report.behavior_tags.map((t, i) => (
@@ -148,7 +148,7 @@ export default function ReportView({ report }: { report: ReportResponse }) {
       {/* ── Cognitive profile ── */}
       {cog && (
         <section>
-          <h3 className="font-bold text-sm mb-3">🧩 Cognitive Profile</h3>
+          <h3 className="font-bold text-sm mb-3">Cognitive Profile</h3>
           {cog.thinking_fingerprint && (
             <p className="text-sm mb-2">
               <b>Analytical depth:</b> {cog.thinking_fingerprint.analytical_depth || "—"} ·{" "}
@@ -175,16 +175,16 @@ export default function ReportView({ report }: { report: ReportResponse }) {
 
       {/* ── Strengths / weaknesses / patterns / recommendations ── */}
       {report.strengths.length > 0 && (
-        <ListSection title="✅ Strengths" items={report.strengths} kind="strength" />
+        <ListSection title="Strengths" items={report.strengths} kind="strength" />
       )}
       {report.weaknesses.length > 0 && (
-        <ListSection title="⚠️ Weaknesses" items={report.weaknesses} kind="weakness" />
+        <ListSection title="Weaknesses" items={report.weaknesses} kind="weakness" />
       )}
       {report.patterns.length > 0 && (
-        <ListSection title="🔍 Patterns Detected" items={report.patterns} kind="pattern" />
+        <ListSection title="Patterns Detected" items={report.patterns} kind="pattern" />
       )}
       {report.recommendations.length > 0 && (
-        <ListSection title="💡 Recommendations" items={report.recommendations} kind="rec" />
+        <ListSection title="Recommendations" items={report.recommendations} kind="rec" />
       )}
     </div>
   );

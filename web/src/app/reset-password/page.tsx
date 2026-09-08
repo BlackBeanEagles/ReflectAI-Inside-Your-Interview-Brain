@@ -53,7 +53,7 @@ function ResetPasswordForm() {
     <div className="min-h-[70vh] flex items-center justify-center">
       <div className="max-w-sm w-full ri-fade-in">
         <Card>
-          <h1 className="text-xl font-bold mb-1">🔑 Set a new password</h1>
+          <h1 className="text-xl font-bold mb-1">Set a new password</h1>
           <p className="text-sm text-ri-text-mute mb-5">
             This link is single-use and expires 1 hour after it was requested.
           </p>

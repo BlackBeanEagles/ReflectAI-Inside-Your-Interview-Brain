@@ -2,52 +2,43 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BarChart3, FileText, ListChecks, MessagesSquare, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useHealth } from "@/lib/hooks";
 
+// Real icons rather than emoji. Emoji render as a different typeface on every
+// platform, can't inherit colour or stroke weight, and sit on their own
+// baseline -- so a row of them never optically aligns with the labels beside
+// them. lucide-react was already a dependency and previously went unused.
 const NAV_ITEMS = [
-  { href: "/", label: "Interview Session", icon: "🎯" },
-  { href: "/resume", label: "Resume Analysis", icon: "📄" },
-  { href: "/ats", label: "ATS Score", icon: "✅" },
-  { href: "/predict", label: "Predicted Questions", icon: "🔮" },
-  { href: "/history", label: "History", icon: "📊" },
+  { href: "/", label: "Interview", icon: MessagesSquare },
+  { href: "/resume", label: "Resume", icon: FileText },
+  { href: "/ats", label: "ATS Score", icon: ListChecks },
+  { href: "/predict", label: "Questions", icon: Sparkles },
+  { href: "/history", label: "History", icon: BarChart3 },
 ];
 
 function StatusDot() {
   const { health, checked } = useHealth();
 
   if (!checked) {
-    return (
-      <span
-        role="status"
-        aria-label="Checking backend status…"
-        className="inline-block h-2 w-2 shrink-0 rounded-full bg-ri-text-mute/50"
-      />
-    );
+    return <span role="status" aria-label="Checking backend status…" className="h-1.5 w-1.5 shrink-0 rounded-full bg-ri-border-strong" />;
   }
 
   const ok = health?.api === "ok";
   const text = ok ? `${health?.model} ready (${health?.provider})` : "Backend unreachable";
-  const color = ok ? "var(--ri-good-line)" : "var(--ri-stress)";
 
   // `title` alone (a mouse-hover tooltip) isn't reliably exposed to screen
-  // readers and doesn't exist on touch devices -- aria-label carries the
-  // same text so the status is actually announced, not just visible as a
-  // colored dot. The halo is decorative reinforcement of the same signal.
+  // readers and doesn't exist on touch devices -- aria-label carries the same
+  // text so the status is announced, not just visible as a coloured dot.
   return (
-    <span role="status" aria-label={text} title={text} className="relative flex h-2 w-2 shrink-0">
-      {ok && (
-        <span
-          aria-hidden
-          className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60"
-          style={{ background: color, animationDuration: "2.4s" }}
-        />
-      )}
-      <span
-        className="relative inline-flex h-2 w-2 rounded-full"
-        style={{ background: color, boxShadow: `0 0 8px ${color}` }}
-      />
-    </span>
+    <span
+      role="status"
+      aria-label={text}
+      title={text}
+      className="h-1.5 w-1.5 shrink-0 rounded-full"
+      style={{ background: ok ? "var(--ri-good-line)" : "var(--ri-stress)" }}
+    />
   );
 }
 
@@ -56,121 +47,82 @@ export default function Nav() {
   const { user, logout } = useAuth();
 
   return (
-    <header className="sticky top-0 z-20 border-b border-ri-border/60 bg-[var(--ri-glass)] backdrop-blur-xl backdrop-saturate-150">
+    <header className="sticky top-0 z-20 border-b border-ri-border bg-ri-surface">
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
-        <div className="flex h-16 items-center justify-between gap-4">
-          {/* Shrinkable below md, fixed at md and up. At 375px the logo +
-              wordmark + auth buttons come out ~1px wider than the viewport, and
-              a group that refuses to shrink gives the whole page a horizontal
-              scrollbar; letting the wordmark truncate absorbs that. From md up
-              the row has room, so it must NOT shrink -- otherwise flex trims
-              the wordmark to "ReflectInte…" on a perfectly wide screen. */}
-          <Link
-            href="/"
-            className="ri-focus group flex min-w-0 items-center gap-2.5 rounded-lg md:shrink-0"
-          >
-            {/* Gradient tile instead of a bare emoji -- gives the wordmark
-                something to sit against and ties the header to the aurora. */}
-            <span
-              aria-hidden
-              className="flex h-8 w-8 items-center justify-center rounded-xl text-base
-                bg-[linear-gradient(135deg,var(--ri-iris),var(--ri-violet)_60%,var(--ri-magenta))]
-                shadow-[0_3px_14px_color-mix(in_srgb,var(--ri-violet)_45%,transparent)]
-                transition-transform duration-300 group-hover:scale-105 group-hover:rotate-6"
-            >
-              🎯
-            </span>
-            <span className="truncate text-[17px] font-extrabold tracking-tight">
-              ReflectInterview
-            </span>
+        <div className="flex h-14 items-center justify-between gap-4">
+          <Link href="/" className="ri-focus flex min-w-0 items-center gap-2 md:shrink-0">
+            <span className="ri-title truncate text-[15px]">ReflectInterview</span>
             <StatusDot />
           </Link>
 
-          <nav className="hidden items-center gap-0.5 md:flex">
-            {NAV_ITEMS.map((item) => {
-              const active = pathname === item.href;
+          <nav className="hidden items-center gap-1 md:flex">
+            {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+              const active = pathname === href;
               return (
                 <Link
-                  key={item.href}
-                  href={item.href}
+                  key={href}
+                  href={href}
                   aria-current={active ? "page" : undefined}
-                  className={`ri-focus relative rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300 ${
+                  className={`ri-focus flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
                     active
-                      ? "text-ri-accent"
-                      : "text-ri-text-mute hover:-translate-y-px hover:text-ri-text"
+                      ? "bg-ri-accent-soft font-medium text-ri-accent"
+                      : "text-ri-text-mute hover:bg-ri-surface-alt hover:text-ri-text"
                   }`}
                 >
-                  {active && (
-                    <span
-                      aria-hidden
-                      className="absolute inset-0 rounded-lg border border-ri-accent/25
-                        bg-[color-mix(in_srgb,var(--ri-accent)_12%,transparent)]
-                        shadow-[0_0_18px_color-mix(in_srgb,var(--ri-accent)_22%,transparent)]"
-                    />
-                  )}
-                  <span className="relative">
-                    <span className="mr-1">{item.icon}</span>
-                    {item.label}
-                  </span>
+                  <Icon size={15} strokeWidth={1.75} aria-hidden />
+                  {label}
                 </Link>
               );
             })}
           </nav>
 
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 text-sm">
             {user ? (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="hidden max-w-[160px] truncate text-ri-text-mute sm:inline">
+              <>
+                <span className="hidden max-w-[150px] truncate text-ri-text-mute sm:inline">
                   {user.name || user.email}
                 </span>
                 <button
                   onClick={logout}
-                  className="ri-focus rounded-lg border border-ri-border px-3 py-1.5 text-sm
-                    transition-colors hover:border-ri-stress/50 hover:text-ri-stress"
+                  className="ri-focus rounded-md px-2.5 py-1.5 text-ri-text-mute transition-colors hover:text-ri-text"
                 >
                   Log out
                 </button>
-              </div>
+              </>
             ) : (
-              <div className="flex items-center gap-2">
+              <>
                 <Link
                   href="/login"
-                  className="ri-focus rounded-lg px-3 py-1.5 text-sm font-medium text-ri-text-mute
-                    transition-colors hover:text-ri-text"
+                  className="ri-focus rounded-md px-2.5 py-1.5 text-ri-text-mute transition-colors hover:text-ri-text"
                 >
                   Log in
                 </Link>
                 <Link
                   href="/signup"
-                  className="ri-sheen ri-focus rounded-lg px-3.5 py-1.5 text-sm font-semibold text-white
-                    bg-[linear-gradient(120deg,var(--ri-iris),var(--ri-violet))]
-                    shadow-[0_3px_14px_color-mix(in_srgb,var(--ri-iris)_40%,transparent)]
-                    transition-transform duration-300 hover:-translate-y-0.5"
+                  className="ri-focus rounded-md bg-ri-accent px-3 py-1.5 font-medium text-white transition-colors hover:bg-[var(--ri-accent-hover)]"
                 >
                   Sign up
                 </Link>
-              </div>
+              </>
             )}
           </div>
         </div>
 
-        {/* Mobile nav row -- horizontally scrollable so it never wraps awkwardly */}
-        <nav className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-2 md:hidden">
-          {NAV_ITEMS.map((item) => {
-            const active = pathname === item.href;
+        {/* Mobile nav -- horizontally scrollable so it never wraps awkwardly */}
+        <nav className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 md:hidden">
+          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href;
             return (
               <Link
-                key={item.href}
-                href={item.href}
+                key={href}
+                href={href}
                 aria-current={active ? "page" : undefined}
-                className={`ri-focus shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                  active
-                    ? "border border-ri-accent/30 bg-[color-mix(in_srgb,var(--ri-accent)_14%,transparent)] text-ri-accent"
-                    : "border border-ri-border bg-ri-surface-alt/60 text-ri-text-mute"
+                className={`ri-focus flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
+                  active ? "bg-ri-accent-soft font-medium text-ri-accent" : "text-ri-text-mute"
                 }`}
               >
-                <span className="mr-1">{item.icon}</span>
-                {item.label}
+                <Icon size={14} strokeWidth={1.75} aria-hidden />
+                {label}
               </Link>
             );
           })}

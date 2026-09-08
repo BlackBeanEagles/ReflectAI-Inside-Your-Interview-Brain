@@ -9,6 +9,7 @@ import type { CleanedResume, EvaluateResponse, ReportResponse, VoiceAnalysis } f
 import {
   Alert,
   Card,
+  CardBody,
   PrimaryButton,
   ProgressTrack,
   ROUND_ACCENT,
@@ -21,6 +22,18 @@ import {
 } from "@/components/ui";
 import ReportView from "@/components/ReportView";
 import { ResumePicker } from "@/components/ResumePicker";
+import type { LucideIcon } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  Download,
+  Lightbulb,
+  Mic,
+  RotateCcw,
+  Square,
+  TriangleAlert,
+  Volume2,
+} from "lucide-react";
 
 const MAX_QUESTIONS = 10;
 
@@ -467,24 +480,28 @@ function InterviewSessionInner() {
   // ── Render: report phase ────────────────────────────────────────────────
   if (phase === "report" && report) {
     return (
-      <div className="space-y-6 ri-fade-in">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="ri-enter space-y-6">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ri-text-mute">
-              Session complete
-            </p>
-            <h1 className="ri-hero-title text-3xl font-extrabold">Final Report</h1>
+            <p className="ri-eyebrow">Session complete</p>
+            <h1 className="ri-display mt-1 text-3xl">Final report</h1>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <SecondaryButton onClick={handleDownloadPdf} disabled={pdfLoading}>
-              {pdfLoading ? "Preparing…" : "⬇️ Download PDF"}
+              <Download size={15} strokeWidth={1.75} aria-hidden />
+              {pdfLoading ? "Preparing…" : "Download PDF"}
             </SecondaryButton>
-            <SecondaryButton onClick={handleResetInterview}>↩ New interview</SecondaryButton>
+            <SecondaryButton onClick={handleResetInterview}>
+              <RotateCcw size={15} strokeWidth={1.75} aria-hidden />
+              New interview
+            </SecondaryButton>
           </div>
         </div>
         {reportError && <Alert kind="error">{reportError}</Alert>}
-        <Card glow>
-          <ReportView report={report} />
+        <Card>
+          <CardBody>
+            <ReportView report={report} />
+          </CardBody>
         </Card>
       </div>
     );
@@ -493,19 +510,22 @@ function InterviewSessionInner() {
   // ── Render: interview phase ─────────────────────────────────────────────
   if (phase === "interview") {
     return (
-      <div className="space-y-5 ri-fade-in">
+      <div className="ri-enter space-y-5">
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h1 className="text-xl font-bold">
-                Question <span className="ri-gradient-text">{count}</span>
-                <span className="text-ri-text-mute font-medium"> / {MAX_QUESTIONS}</span>
+              <h1 className="ri-title text-lg tabular-nums">
+                Question {count}
+                <span className="font-normal text-ri-text-mute"> of {MAX_QUESTIONS}</span>
               </h1>
               <p className="mt-0.5 text-xs text-ri-text-mute">
                 {storedCount} answer{storedCount !== 1 ? "s" : ""} saved to this session
               </p>
             </div>
-            <SecondaryButton onClick={handleResetInterview}>↩ Reset</SecondaryButton>
+            <SecondaryButton onClick={handleResetInterview}>
+              <RotateCcw size={15} strokeWidth={1.75} aria-hidden />
+              Reset
+            </SecondaryButton>
           </div>
           {/* Turns "how much longer is this?" from a guess into a glance --
               and the bar takes the round's colour, so the escalation into
@@ -521,145 +541,150 @@ function InterviewSessionInner() {
 
         {interviewComplete ? (
           <Card>
-            <Alert kind="success">
-              Interview session complete. {completionNotice} Generate your final report below when
-              you&apos;re ready.
-            </Alert>
-            <div className="mt-4">
-              <PrimaryButton onClick={handleGenerateReport} disabled={reportLoading}>
-                {reportLoading ? "Generating report…" : "📊 Generate Final Report"}
-              </PrimaryButton>
-            </div>
-            {reportError && (
-              <div className="mt-3">
-                <Alert kind="error">{reportError}</Alert>
+            <CardBody>
+              <Alert kind="success">
+                Interview session complete. {completionNotice} Generate your final report below when
+                you&apos;re ready.
+              </Alert>
+              <div className="mt-4">
+                <PrimaryButton onClick={handleGenerateReport} disabled={reportLoading}>
+                  {reportLoading ? "Generating report…" : "Generate final report"}
+                </PrimaryButton>
               </div>
-            )}
+              {reportError && (
+                <div className="mt-3">
+                  <Alert kind="error">{reportError}</Alert>
+                </div>
+              )}
+            </CardBody>
           </Card>
         ) : interviewError ? (
           <Alert kind="error">{interviewError}</Alert>
         ) : nextLoading && !currentQuestion ? (
-          <Card glow>
-            <Spinner label="Generating question… (first one takes longest while the model warms up)" />
-            <div className="mt-3">
-              <ProgressTrack />
-            </div>
+          <Card>
+            <CardBody>
+              <Spinner label="Generating question… the first one takes longest while the model warms up." />
+              <div className="mt-4">
+                <ProgressTrack />
+              </div>
+            </CardBody>
           </Card>
         ) : currentQuestion ? (
-          <Card key={count} glow className="ri-rise">
-            <RoundBadge round={round} />
-            {/* The question panel is tinted by the active round rather than
-                picking from three hardcoded class strings, so adding a round
-                later only means adding a hue to ROUND_ACCENT. */}
-            <div
-              className="mt-3 rounded-xl border-l-[3px] p-4 text-base leading-relaxed"
-              style={{
-                borderLeftColor: ROUND_ACCENT[round] || ROUND_ACCENT.hr,
-                background: `linear-gradient(100deg, color-mix(in srgb, ${
-                  ROUND_ACCENT[round] || ROUND_ACCENT.hr
-                } 9%, transparent), transparent 70%), var(--ri-surface-alt)`,
-              }}
-            >
-              {currentQuestion}
-            </div>
-            <button
-              onClick={() => speakText(currentQuestion)}
-              className="ri-focus mt-2.5 rounded-lg text-sm text-ri-accent transition-opacity hover:opacity-75"
-            >
-              🔊 Listen to the question
-            </button>
+          <Card key={count} className="ri-enter">
+            <CardBody>
+              <RoundBadge round={round} />
+              {/* The rule takes the active round's colour, so the escalation
+                  shows in the question itself, not only in the label above it. */}
+              <p
+                className="mt-3 border-l-2 pl-4 text-[17px] leading-relaxed"
+                style={{ borderLeftColor: ROUND_ACCENT[round] || ROUND_ACCENT.hr }}
+              >
+                {currentQuestion}
+              </p>
+              <button
+                onClick={() => speakText(currentQuestion)}
+                className="ri-focus mt-3 flex items-center gap-1.5 text-sm text-ri-text-mute transition-colors hover:text-ri-text"
+              >
+                <Volume2 size={15} strokeWidth={1.75} aria-hidden />
+                Listen to the question
+              </button>
 
-            {/* Voice recording */}
-            <div className="mt-4 rounded-xl border border-ri-border bg-ri-surface-alt/40 p-3">
-              <p className="mb-2 text-sm font-semibold">🎙️ Record your answer instead of typing</p>
-              <div className="flex flex-wrap items-center gap-2">
-                {!recording ? (
-                  <SecondaryButton onClick={startRecording}>● Start recording</SecondaryButton>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={stopRecording}
-                    className="ri-pulse-ring ri-focus flex items-center gap-2 rounded-xl border px-4 py-2.5 font-semibold transition-colors"
-                    style={{
-                      color: "var(--ri-stress)",
-                      borderColor: "color-mix(in srgb, var(--ri-stress) 45%, transparent)",
-                      background: "color-mix(in srgb, var(--ri-stress) 10%, transparent)",
-                    }}
-                  >
-                    <span
-                      aria-hidden
-                      className="inline-block h-2.5 w-2.5 rounded-sm"
-                      style={{ background: "var(--ri-stress)" }}
-                    />
-                    Stop recording
-                  </button>
-                )}
-                {audioBlob && !recording && (
-                  <SecondaryButton onClick={transcribeRecording} disabled={transcribing}>
-                    {transcribing ? "Transcribing…" : "📝 Transcribe into answer box"}
-                  </SecondaryButton>
+              <div className="mt-5 space-y-3">
+                <TextArea
+                  label="Your answer"
+                  value={answer}
+                  onChange={setAnswer}
+                  placeholder="Type your answer, or record it below…"
+                  rows={5}
+                />
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {!recording ? (
+                    <SecondaryButton onClick={startRecording}>
+                      <Mic size={15} strokeWidth={1.75} aria-hidden />
+                      Record instead
+                    </SecondaryButton>
+                  ) : (
+                    <SecondaryButton onClick={stopRecording} className="!text-ri-stress">
+                      {/* Recording is the one genuinely live state in the app,
+                          so it is the one thing that pulses continuously. */}
+                      <Square
+                        size={13}
+                        strokeWidth={1.75}
+                        className="ri-rec"
+                        fill="currentColor"
+                        aria-hidden
+                      />
+                      Stop recording
+                    </SecondaryButton>
+                  )}
+                  {audioBlob && !recording && (
+                    <SecondaryButton onClick={transcribeRecording} disabled={transcribing}>
+                      {transcribing ? "Transcribing…" : "Transcribe into answer"}
+                    </SecondaryButton>
+                  )}
+                </div>
+
+                {voiceError && <Alert kind="error">{voiceError}</Alert>}
+                {voiceAnalysis && (
+                  <p className="text-xs leading-relaxed text-ri-text-mute">
+                    {voiceAnalysis.filler_words.filler_count} filler word
+                    {voiceAnalysis.filler_words.filler_count !== 1 ? "s" : ""} (
+                    {(voiceAnalysis.filler_words.filler_ratio * 100).toFixed(0)}% of words)
+                    {voiceAnalysis.pace && ` · ${voiceAnalysis.pace.words_per_minute.toFixed(0)} wpm (${voiceAnalysis.pace.pace_label})`}
+                    {voiceAnalysis.pauses && ` · ${voiceAnalysis.pauses.pause_count} pause${voiceAnalysis.pauses.pause_count !== 1 ? "s" : ""}`}
+                    {` · confidence ${voiceAnalysis.confidence.confidence_score.toFixed(1)}/10`}
+                    {" — measured from your recording, not from later edits to the text."}
+                  </p>
                 )}
               </div>
-              {voiceError && <div className="mt-2"><Alert kind="error">{voiceError}</Alert></div>}
-              {voiceAnalysis && (
-                <div className="mt-2 text-xs text-ri-text-mute space-y-0.5">
-                  <p>
-                    🗯️ {voiceAnalysis.filler_words.filler_count} filler word(s) (
-                    {(voiceAnalysis.filler_words.filler_ratio * 100).toFixed(0)}%)
-                    {voiceAnalysis.pace && ` · ⏱️ ${voiceAnalysis.pace.words_per_minute.toFixed(0)} wpm (${voiceAnalysis.pace.pace_label})`}
-                    {voiceAnalysis.pauses && ` · ⏸️ ${voiceAnalysis.pauses.pause_count} pause(s)`}
-                    {` · 🎯 Confidence: ${voiceAnalysis.confidence.confidence_score.toFixed(1)}/10`}
-                    {" — based on your recording, not later edits to the text."}
-                  </p>
+
+              {/* Stacked below sm: side by side the primary label wraps to two
+                  lines on a 375px screen and stretches Skip to match. */}
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <PrimaryButton
+                  onClick={handleEvaluate}
+                  disabled={evaluated || evalLoading || !answer.trim()}
+                  className="w-full sm:w-auto"
+                >
+                  {evalLoading ? "Evaluating…" : "Evaluate answer"}
+                </PrimaryButton>
+                <SecondaryButton onClick={handleSkip} disabled={nextLoading} className="w-full sm:w-auto">
+                  Skip
+                </SecondaryButton>
+              </div>
+
+              {evalError && <div className="mt-3"><Alert kind="error">{evalError}</Alert></div>}
+
+              {evalResult && (
+                <div className="ri-enter mt-6 space-y-5 border-t border-ri-border pt-5">
+                  {/* Grid, not flex-wrap: there are five panels, so wrapping
+                      leaves the last alone on its row where flex-1 stretches it
+                      to full width -- one giant ring beside two small ones. */}
+                  <div className="ri-stagger grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap">
+                    <ScorePanel label="Overall" score={evalResult.final_score} />
+                    {Object.entries(evalResult.scores).map(([dim, val]) => (
+                      <ScorePanel key={dim} label={dim} score={val} />
+                    ))}
+                  </div>
+                  <dl className="ri-stagger space-y-3">
+                    <FeedbackLine Icon={Check} label="Strength" tone="var(--ri-good-line)">
+                      {evalResult.feedback.strength}
+                    </FeedbackLine>
+                    <FeedbackLine Icon={TriangleAlert} label="Weakness" tone="var(--ri-warn-line)">
+                      {evalResult.feedback.weakness}
+                    </FeedbackLine>
+                    <FeedbackLine Icon={Lightbulb} label="Improvement" tone="var(--ri-accent)">
+                      {evalResult.feedback.improvement}
+                    </FeedbackLine>
+                  </dl>
+                  <PrimaryButton onClick={handleNext} disabled={nextLoading}>
+                    {nextLoading ? "Loading next question…" : "Next question"}
+                    <ArrowRight size={15} strokeWidth={1.75} aria-hidden />
+                  </PrimaryButton>
                 </div>
               )}
-            </div>
-
-            <div className="mt-4">
-              <TextArea
-                label="Your Answer"
-                value={answer}
-                onChange={setAnswer}
-                placeholder="Type your answer here, or record it above…"
-                rows={5}
-              />
-            </div>
-
-            <div className="mt-4 flex gap-3">
-              <PrimaryButton onClick={handleEvaluate} disabled={evaluated || evalLoading || !answer.trim()}>
-                {evalLoading ? "Evaluating…" : "🧠 Evaluate My Answer"}
-              </PrimaryButton>
-              <SecondaryButton onClick={handleSkip} disabled={nextLoading}>
-                Skip →
-              </SecondaryButton>
-            </div>
-
-            {evalError && <div className="mt-3"><Alert kind="error">{evalError}</Alert></div>}
-
-            {evalResult && (
-              <div className="ri-rise mt-5 space-y-4 border-t border-ri-border pt-4">
-                <div className="ri-stagger flex flex-wrap gap-3">
-                  <ScorePanel label="Score" score={evalResult.final_score} />
-                  {Object.entries(evalResult.scores).map(([dim, val]) => (
-                    <ScorePanel key={dim} label={dim} score={val} />
-                  ))}
-                </div>
-                <div className="ri-stagger space-y-2">
-                  <FeedbackLine icon="✅" label="Strength" tone="var(--ri-good-line)">
-                    {evalResult.feedback.strength}
-                  </FeedbackLine>
-                  <FeedbackLine icon="⚠️" label="Weakness" tone="var(--ri-warn-line)">
-                    {evalResult.feedback.weakness}
-                  </FeedbackLine>
-                  <FeedbackLine icon="💡" label="Improvement" tone="var(--ri-violet)">
-                    {evalResult.feedback.improvement}
-                  </FeedbackLine>
-                </div>
-                <PrimaryButton onClick={handleNext} disabled={nextLoading}>
-                  {nextLoading ? "Loading next question…" : "Next Question →"}
-                </PrimaryButton>
-              </div>
-            )}
+            </CardBody>
           </Card>
         ) : null}
       </div>
@@ -668,33 +693,28 @@ function InterviewSessionInner() {
 
   // ── Render: setup phase ─────────────────────────────────────────────────
   return (
-    <div className="space-y-7 ri-fade-in">
-      <div className="ri-legible py-6 text-center sm:py-10">
-        <span className="ri-rise mb-5 inline-flex items-center gap-2 rounded-full border border-ri-border bg-ri-surface/60 px-3.5 py-1.5 text-xs font-medium text-ri-text-mute backdrop-blur-sm">
-          <span
-            className="inline-block h-1.5 w-1.5 rounded-full"
-            style={{ background: "var(--ri-cyan)", boxShadow: "0 0 8px var(--ri-cyan)" }}
-          />
-          Adaptive AI interviewer · voice or text
-        </span>
-        <h1 className="ri-hero-title mx-auto mb-4 max-w-3xl text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-6xl">
-          Practice the interview before it counts
+    <div className="ri-enter space-y-8">
+      <div className="max-w-2xl pt-2 sm:pt-6">
+        <p className="ri-eyebrow">Adaptive AI interviewer</p>
+        <h1 className="ri-display mt-3 text-[2.25rem] sm:text-[3.25rem]">
+          Practice the interview before it counts.
         </h1>
-        <p className="mx-auto max-w-xl text-ri-text-mute sm:text-lg">
-          Paste or upload your resume and get a full adaptive mock interview — HR warm-up,
-          technical questions tailored to your skills, and a stress round if you need the
-          pressure-testing. Every answer gets instant AI feedback.
+        <p className="ri-prose mt-4 text-[17px] leading-relaxed text-ri-text-mute">
+          Paste your resume and get a full mock interview — an HR warm-up, technical questions
+          drawn from your own projects, and a stress round if your scores start slipping. Every
+          answer is scored and returned with specific feedback.
         </p>
       </div>
 
-      <div className="ri-stagger grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <FeatureCard icon="💬" title="HR round" desc="2 warm-up behavioural questions" tone="azure" />
-        <FeatureCard icon="🛠️" title="Technical round" desc="Adaptive difficulty from your resume" tone="indigo" />
-        <FeatureCard icon="🔥" title="Stress round" desc="Rapid-fire if scores dip" tone="orchid" />
-        <FeatureCard icon="📊" title="Final report" desc="Scores, patterns, cognitive profile" tone="coral" />
-      </div>
+      <dl className="ri-stagger grid gap-x-8 gap-y-5 border-y border-ri-border py-6 sm:grid-cols-2 lg:grid-cols-4">
+        <Stage n="01" title="HR round" desc="Two behavioural questions to open." />
+        <Stage n="02" title="Technical round" desc="Difficulty adapts to how you answer." />
+        <Stage n="03" title="Stress round" desc="Rapid-fire, only if your scores dip." />
+        <Stage n="04" title="Report" desc="Scores, recurring patterns, next steps." />
+      </dl>
 
-      <Card glow iridescent>
+      <Card>
+        <CardBody>
         {setupError && (
           <div className="mb-4">
             <Alert kind="error">{setupError}</Alert>
@@ -717,9 +737,8 @@ function InterviewSessionInner() {
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="w-full cursor-pointer rounded-xl border border-ri-border bg-ri-surface-mute/70 px-3.5 py-2.5 text-sm
-                transition-all duration-200 focus:border-ri-accent focus:bg-ri-surface focus:outline-none
-                focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--ri-accent)_16%,transparent)]"
+              className="w-full cursor-pointer rounded-lg border border-ri-border bg-ri-surface px-3 py-2 text-sm
+                transition-colors focus:border-ri-accent focus:outline-none focus:ring-2 focus:ring-ri-accent/25"
             >
               {ROLE_PRESETS.map((r) => (
                 <option key={r} value={r}>{r}</option>
@@ -731,9 +750,8 @@ function InterviewSessionInner() {
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="w-full cursor-pointer rounded-xl border border-ri-border bg-ri-surface-mute/70 px-3.5 py-2.5 text-sm
-                transition-all duration-200 focus:border-ri-accent focus:bg-ri-surface focus:outline-none
-                focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--ri-accent)_16%,transparent)]"
+              className="w-full cursor-pointer rounded-lg border border-ri-border bg-ri-surface px-3 py-2 text-sm
+                transition-colors focus:border-ri-accent focus:outline-none focus:ring-2 focus:ring-ri-accent/25"
             >
               {LANGUAGE_PRESETS.map((l) => (
                 <option key={l} value={l}>{l}</option>
@@ -757,87 +775,56 @@ function InterviewSessionInner() {
           </label>
         )}
 
-        <div className="mt-5">
+        <div className="mt-6">
           <PrimaryButton onClick={handleStart} disabled={setupLoading} className="w-full">
-            {setupLoading ? "Parsing resume…" : "🚀 Start Interview"}
+            {setupLoading ? "Parsing resume…" : "Start interview"}
           </PrimaryButton>
         </div>
+        </CardBody>
       </Card>
     </div>
   );
 }
 
-// Each card pulls one pigment straight from the spectrum, so the four of
-// them read as a single gradient sampled at four points rather than four
-// unrelated status colours.
-const FEATURE_TONES = {
-  azure: "var(--ri-azure)",
-  indigo: "var(--ri-indigo)",
-  orchid: "var(--ri-orchid)",
-  coral: "var(--ri-coral)",
-} as const;
-
-function FeatureCard({
-  icon,
-  title,
-  desc,
-  tone,
-}: {
-  icon: string;
-  title: string;
-  desc: string;
-  tone: keyof typeof FEATURE_TONES;
-}) {
-  const hue = FEATURE_TONES[tone];
+/** One stage of the interview, as a numbered definition-list entry rather
+ *  than a card. Four boxed cards in a row is the default shape for this kind
+ *  of content and reads as filler; a rule with numbered items reads as a
+ *  sequence, which is what the four stages actually are. */
+function Stage({ n, title, desc }: { n: string; title: string; desc: string }) {
   return (
-    <div
-      className="ri-lift group rounded-2xl border p-4 backdrop-blur-sm"
-      style={{
-        borderColor: `color-mix(in srgb, ${hue} 26%, transparent)`,
-        background: `linear-gradient(150deg, color-mix(in srgb, ${hue} 13%, transparent), transparent 62%), color-mix(in srgb, var(--ri-surface) 55%, transparent)`,
-      }}
-    >
-      <div
-        className="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl text-lg
-          transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6"
-        style={{
-          background: `linear-gradient(135deg, color-mix(in srgb, ${hue} 26%, transparent), color-mix(in srgb, ${hue} 8%, transparent))`,
-          boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${hue} 30%, transparent)`,
-        }}
-      >
-        {icon}
-      </div>
-      <div className="text-sm font-bold">{title}</div>
-      <div className="mt-0.5 text-xs text-ri-text-mute">{desc}</div>
+    <div>
+      <dt className="flex items-baseline gap-2">
+        <span className="text-xs font-medium tabular-nums text-ri-text-mute">{n}</span>
+        <span className="ri-title text-[15px]">{title}</span>
+      </dt>
+      <dd className="mt-1 text-sm leading-relaxed text-ri-text-mute">{desc}</dd>
     </div>
   );
 }
 
-/** One line of per-answer feedback, colour-keyed so strength / weakness /
- *  improvement are separable at a glance instead of three identical
- *  paragraphs of body text. */
+/** One line of per-answer feedback. The icon and rule are tinted so
+ *  strength / weakness / improvement are separable at a glance instead of
+ *  three identical paragraphs of body text. */
 function FeedbackLine({
-  icon,
+  Icon,
   label,
   tone,
   children,
 }: {
-  icon: string;
+  Icon: LucideIcon;
   label: string;
   tone: string;
   children: React.ReactNode;
 }) {
   return (
-    <div
-      className="flex items-start gap-2.5 rounded-xl border-l-[3px] bg-ri-surface-alt/50 px-3.5 py-2.5 text-sm"
-      style={{ borderLeftColor: tone }}
-    >
-      <span aria-hidden className="mt-px shrink-0">
-        {icon}
-      </span>
-      <span className="min-w-0">
-        <b style={{ color: tone }}>{label}:</b> {children}
-      </span>
+    <div className="flex gap-3">
+      <Icon size={15} strokeWidth={2} className="mt-0.5 shrink-0" style={{ color: tone }} aria-hidden />
+      <div className="min-w-0">
+        <dt className="text-xs font-semibold" style={{ color: tone }}>
+          {label}
+        </dt>
+        <dd className="mt-0.5 text-sm leading-relaxed text-ri-text-mute">{children}</dd>
+      </div>
     </div>
   );
 }

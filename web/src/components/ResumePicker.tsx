@@ -8,6 +8,7 @@
 // swap files without reopening the OS file picker.
 
 import { useState } from "react";
+import { FileText, Paperclip, Upload, X } from "lucide-react";
 import { TextArea } from "./ui";
 import { useSharedResume, type SharedResume } from "@/lib/resume-context";
 
@@ -72,30 +73,38 @@ export function ResumePicker({
         <button
           type="button"
           onClick={applyLastResume}
-          className="mb-3 flex w-full items-center gap-2 rounded-lg border border-ri-info-line bg-ri-info-bg px-3 py-2 text-left text-sm text-ri-info-fg hover:opacity-90"
+          className="ri-focus mb-3 flex w-full items-center gap-2 rounded-lg border border-ri-border bg-ri-surface-alt px-3 py-2 text-left text-sm transition-colors hover:border-ri-border-strong"
         >
-          <span className="shrink-0">📎</span>
+          <Paperclip size={14} strokeWidth={1.75} className="shrink-0 text-ri-text-mute" aria-hidden />
           <span className="min-w-0 flex-1 truncate">
             Use the resume from earlier — <b>{describeResume(lastResume)}</b>
           </span>
           <span className="shrink-0 text-xs font-semibold underline">Use this</span>
         </button>
       )}
-      <div className="flex gap-2 mb-3">
-        <button
-          type="button"
-          onClick={() => onMethodChange("paste")}
-          className={`px-3 py-1.5 rounded-md text-sm font-medium ${method === "paste" ? "bg-ri-accent text-white" : "border border-ri-border"}`}
-        >
-          Paste text
-        </button>
-        <button
-          type="button"
-          onClick={() => onMethodChange("upload")}
-          className={`px-3 py-1.5 rounded-md text-sm font-medium ${method === "upload" ? "bg-ri-accent text-white" : "border border-ri-border"}`}
-        >
-          Upload PDF
-        </button>
+      {/* A segmented control rather than two loose buttons: these are two
+          states of one choice, so they should share an enclosure. */}
+      <div
+        role="tablist"
+        aria-label="Resume input method"
+        className="mb-3 inline-flex rounded-lg border border-ri-border bg-ri-surface-alt p-0.5"
+      >
+        {(["paste", "upload"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={method === m}
+            onClick={() => onMethodChange(m)}
+            className={`ri-focus rounded-[6px] px-3 py-1 text-[13px] font-medium transition-colors ${
+              method === m
+                ? "bg-ri-surface text-ri-text shadow-[var(--ri-shadow)]"
+                : "text-ri-text-mute hover:text-ri-text"
+            }`}
+          >
+            {m === "paste" ? "Paste text" : "Upload PDF"}
+          </button>
+        ))}
       </div>
 
       {method === "paste" ? (
@@ -114,9 +123,10 @@ export function ResumePicker({
             {label}{optional ? " (optional)" : ""}
           </span>
           {file ? (
-            <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-ri-border bg-ri-surface-mute text-sm">
-              <span className="truncate min-w-0">
-                📄 <b>{file.name}</b>{" "}
+            <div className="flex items-center gap-2.5 rounded-lg border border-ri-border bg-ri-surface px-3 py-2.5 text-sm">
+              <FileText size={15} strokeWidth={1.75} className="shrink-0 text-ri-text-mute" aria-hidden />
+              <span className="min-w-0 flex-1 truncate">
+                {file.name}{" "}
                 <span className="text-ri-text-mute">({(file.size / 1024).toFixed(0)} KB)</span>
               </span>
               <button
@@ -124,9 +134,9 @@ export function ResumePicker({
                 onClick={() => handleFileChange(null)}
                 aria-label="Remove file"
                 title="Remove file"
-                className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-ri-text-mute hover:text-ri-stress hover:bg-ri-surface-alt"
+                className="ri-focus flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-ri-text-mute transition-colors hover:bg-ri-surface-alt hover:text-ri-text"
               >
-                ✕
+                <X size={14} strokeWidth={2} aria-hidden />
               </button>
             </div>
           ) : (
@@ -141,11 +151,13 @@ export function ResumePicker({
                 setDragOver(false);
                 acceptFile(e.dataTransfer.files);
               }}
-              className={`flex flex-col items-center justify-center gap-1 px-4 py-8 rounded-lg border-2 border-dashed text-center text-sm cursor-pointer transition-colors ${
-                dragOver ? "border-ri-accent bg-ri-info-bg" : "border-ri-border hover:border-ri-accent"
+              className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-4 py-9 text-center text-sm transition-colors ${
+                dragOver
+                  ? "border-ri-accent bg-ri-accent-soft"
+                  : "border-ri-border-strong hover:border-ri-accent hover:bg-ri-surface-alt"
               }`}
             >
-              <span className="text-2xl">📄</span>
+              <Upload size={18} strokeWidth={1.5} className="text-ri-text-mute" aria-hidden />
               <span className="font-medium">Drop a PDF here, or click to browse</span>
               <span className="text-xs text-ri-text-mute">PDF only</span>
               <input

@@ -44,10 +44,7 @@ export default function HistoryPage() {
   if (!user) {
     return (
       <div className="space-y-4">
-        <h1 className="text-3xl font-extrabold">
-          <span aria-hidden>📊</span>{" "}
-          <span className="ri-hero-title">Interview History Dashboard</span>
-        </h1>
+        <h1 className="ri-display text-3xl">Interview History Dashboard</h1>
         <Alert kind="info">
           <Link href="/login" className="underline font-semibold">Log in</Link> to see score trends
           across your past sessions. Anonymous use still works everywhere else — an account just
@@ -76,18 +73,15 @@ export default function HistoryPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-extrabold mb-1">
-          <span aria-hidden>📊</span>{" "}
-          <span className="ri-hero-title">Interview History Dashboard</span>
-        </h1>
-        <p className="text-sm text-ri-text-mute">
+        <h1 className="ri-display text-3xl">Interview History Dashboard</h1>
+        <p className="ri-prose mt-2 text-sm text-ri-text-mute">
           Showing saved sessions for <b>{user.name || user.email}</b> — only sessions you opted in
           to saving during setup appear here.
         </p>
       </div>
 
       <SecondaryButton onClick={loadHistory} disabled={loading}>
-        {loading ? "Refreshing…" : "🔄 Refresh history"}
+        {loading ? "Refreshing…" : "Refresh history"}
       </SecondaryButton>
 
       {error && <Alert kind="error">{error}</Alert>}

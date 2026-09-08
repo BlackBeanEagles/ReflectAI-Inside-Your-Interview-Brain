@@ -115,11 +115,8 @@ export default function ResumeAnalysisPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-extrabold mb-1">
-          <span aria-hidden>📄</span>{" "}
-          <span className="ri-hero-title">Resume Analysis</span>
-        </h1>
-        <p className="text-ri-text-mute text-sm">
+        <h1 className="ri-display text-3xl">Resume Analysis</h1>
+        <p className="ri-prose mt-2 text-ri-text-mute text-sm">
           Upload a PDF or paste text to inspect extracted data and get a technical question.
         </p>
       </div>
@@ -141,7 +138,7 @@ export default function ResumeAnalysisPage() {
         />
         <div className="flex gap-3 mt-4">
           <PrimaryButton onClick={handleParse} disabled={loading}>
-            {loading ? "Parsing…" : "🔍 Parse Resume"}
+            {loading ? "Parsing…" : "Parse Resume"}
           </PrimaryButton>
           <SecondaryButton onClick={handleClear}>Clear</SecondaryButton>
         </div>
@@ -173,7 +170,7 @@ export default function ResumeAnalysisPage() {
 
           <div className="mt-5 pt-4 border-t border-ri-border">
             <PrimaryButton onClick={handleGenerateQuestion} disabled={questionLoading}>
-              {questionLoading ? "Generating…" : "⚡ Generate Question"}
+              {questionLoading ? "Generating…" : "Generate Question"}
             </PrimaryButton>
           </div>
         </Card>
@@ -189,7 +186,7 @@ export default function ResumeAnalysisPage() {
           </div>
           <div className="mt-4">
             <PrimaryButton onClick={handleEvaluate} disabled={evalLoading || !answer.trim()}>
-              {evalLoading ? "Evaluating…" : "🧠 Evaluate Answer"}
+              {evalLoading ? "Evaluating…" : "Evaluate Answer"}
             </PrimaryButton>
           </div>
           {evalResult && (
@@ -197,9 +194,9 @@ export default function ResumeAnalysisPage() {
               <div className="flex gap-3 flex-wrap">
                 <ScorePanel label="Score" score={evalResult.final_score} />
               </div>
-              <p className="text-sm"><b>✅ Strength:</b> {evalResult.feedback.strength}</p>
-              <p className="text-sm"><b>⚠️ Weakness:</b> {evalResult.feedback.weakness}</p>
-              <p className="text-sm"><b>💡 Improvement:</b> {evalResult.feedback.improvement}</p>
+              <p className="text-sm"><b>Strength:</b> {evalResult.feedback.strength}</p>
+              <p className="text-sm"><b>Weakness:</b> {evalResult.feedback.weakness}</p>
+              <p className="text-sm"><b>Improvement:</b> {evalResult.feedback.improvement}</p>
             </div>
           )}
         </Card>

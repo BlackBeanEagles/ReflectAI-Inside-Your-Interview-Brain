@@ -1,109 +1,81 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════════════
-   ReflectInterview — "Aurora" design system
+   ReflectInterview design system
    ───────────────────────────────────────────────────────────────────────
-   One abstract spectrum (iris → violet → cyan → magenta → amber) drives
-   everything: literal UI colour (badges, buttons, alerts) *and* the
-   ambient layer (drifting aurora field, gradient text, glow rings).
-   Retune the spectrum block and the whole product re-tints with it.
+   Governing rule: colour carries meaning or it doesn't appear.
 
-   Every colour is defined on bare :root first and only *re-pointed* in
-   the dark block, so nothing can be defined for one scheme and missing
-   in the other.
+   There are exactly three jobs colour does here --
+     · which interview round you are in (HR / technical / stress),
+     · how a score landed (good / fair / poor),
+     · one accent for things you can interact with.
+   Everything else is ink, surface and space. A decorative gradient with
+   no referent is noise competing with the three signals that matter.
+
+   Every colour is defined on bare :root first and only re-pointed in the
+   dark block, so nothing can be defined for one scheme and missing in
+   the other.
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── The spectrum ───────────────────────────────────────────────────
-     Deliberately abstract: these are not "the HR colour" or "the button
-     colour", they're pigments. Semantic tokens further down mix from
-     them, which is what keeps three rounds, four alert kinds and the
-     aurora feeling like one palette instead of a pile of hex codes.
-
-     Ten stops rather than six, walking the wheel from azure round to
-     amber. The extra stops matter most in the ambient layer: gradients
-     and drifting fields built from a wide ramp produce colours that
-     aren't in the ramp at all, which is the whole point -- the eye
-     reads a continuous spectrum instead of "the brand blue and the
-     brand purple". Green is the one gap, deliberately: it belongs to
-     score/status and must not turn up as decoration. */
-  --ri-azure: #0ea5e9;
-  --ri-cyan: #06b6d4;
-  --ri-cobalt: #2563eb;
-  --ri-indigo: #4f46e5;
-  --ri-iris: #5b6cff;
-  --ri-violet: #8b5cf6;
-  --ri-orchid: #c026d3;
-  --ri-magenta: #ec4899;
-  --ri-coral: #fb7185;
-  --ri-amber: #f59e0b;
-  --ri-crimson: #e11d48;
-
-  /* ── Surfaces ───────────────────────────────────────────────────────
-     The page sits a shade off from card surfaces; without that gap a
-     "card" is only a 1px border away from its own background and the
-     whole UI reads flat. */
-  --ri-page-bg: #eceffa;
+  /* ── Surfaces & ink ─────────────────────────────────────────────────
+     A slight cool cast rather than pure neutral grey -- flat #fff/#000
+     surfaces look unresolved next to the indigo accent. The page sits a
+     shade off from card surfaces so a card reads as raised without
+     needing a shadow to prove it. */
+  --ri-page-bg: #f7f8fb;
   --ri-surface: #ffffff;
-  --ri-surface-alt: #f6f8ff;
-  --ri-surface-mute: #f2f4fc;
-  --ri-border: #e0e5f5;
-  --ri-text: #14162b;
-  --ri-text-mute: #61667a;
-  --ri-track: #e4e8f4;
+  --ri-surface-alt: #f4f6fa;
+  --ri-surface-mute: #eef1f7;
+  --ri-border: #e2e6ee;
+  --ri-border-strong: #cfd5e2;
+  --ri-text: #16181d;
+  --ri-text-mute: #5c6270;
+  --ri-track: #e6e9f0;
 
-  /* Glass: cards float over the aurora rather than hiding it. The blur
-     is what keeps text on glass readable while colour still bleeds
-     through from the moving field behind it. */
-  --ri-glass: rgba(255, 255, 255, 0.72);
-  --ri-glass-strong: rgba(255, 255, 255, 0.88);
-  --ri-glass-border: rgba(255, 255, 255, 0.85);
-  --ri-glass-blur: 20px;
+  /* Tight, low-alpha shadows. A large soft glow reads as decoration; a
+     small shadow reads as elevation. */
+  --ri-shadow: 0 1px 2px rgba(20, 24, 35, 0.05), 0 1px 3px rgba(20, 24, 35, 0.04);
+  --ri-shadow-lift: 0 2px 4px rgba(20, 24, 35, 0.06), 0 8px 20px rgba(20, 24, 35, 0.08);
 
-  --ri-card-shadow: 0 1px 2px rgba(24, 30, 68, 0.04), 0 8px 24px rgba(24, 30, 68, 0.07);
-  --ri-card-shadow-lift: 0 2px 4px rgba(24, 30, 68, 0.05), 0 18px 44px rgba(24, 30, 68, 0.13);
+  /* ── The one accent ── */
+  --ri-accent: #4a5bd4;
+  --ri-accent-hover: #3d4cba;
+  --ri-accent-soft: #eef0fc;
 
-  /* Aurora field. Light mode uses `multiply` so overlapping fields get
-     DARKER and more saturated -- on a pale ground `screen` would drive
-     every overlap towards white and the mixing would vanish exactly where
-     it is supposed to be richest. Opacity is lower here for the same
-     reason: pigment on near-white reads far hotter than on near-black. */
-  --ri-aurora-blend: multiply;
-  --ri-aurora-opacity: 0.55;
-  --ri-prism-opacity: 0.3;
-  --ri-grain-opacity: 0.035;
+  /* ── Round identity ─────────────────────────────────────────────────
+     The interview escalates HR -> technical -> stress, so the hues warm
+     as it does. This is the one place a colour progression does real
+     work: you can tell which round you are in without reading the badge. */
+  --ri-hr: #4a5bd4;
+  --ri-tech: #b4620a;
+  --ri-stress: #b32a45;
 
-  /* ── Semantic, mixed from the spectrum ── */
-  --ri-accent: var(--ri-iris);
-  --ri-tech: #e8720d;
-  --ri-stress: #c81e42;
-
-  --ri-good-bg: #e7fbf0;
-  --ri-good-fg: #0f5734;
-  --ri-good-line: #16a34a;
-  --ri-warn-bg: #fff4e5;
-  --ri-warn-fg: #7a3708;
-  --ri-warn-line: #ea7317;
-  --ri-info-bg: #eef2ff;
-  --ri-info-fg: #1e2a8c;
-  --ri-info-line: var(--ri-iris);
-  --ri-purple-bg: #f5f0ff;
-  --ri-purple-fg: #3d1d8f;
-  --ri-purple-line: var(--ri-violet);
-  --ri-chip-bg: #e9edff;
-  --ri-chip-fg: #2b3792;
+  /* ── Score bands & message kinds ── */
+  --ri-good-bg: #edf9f1;
+  --ri-good-fg: #14532d;
+  --ri-good-line: #17803d;
+  --ri-warn-bg: #fdf5e9;
+  --ri-warn-fg: #703c08;
+  --ri-warn-line: #b4620a;
+  --ri-info-bg: #eef0fc;
+  --ri-info-fg: #27317d;
+  --ri-info-line: #4a5bd4;
+  --ri-purple-bg: #f2effc;
+  --ri-purple-fg: #3f2d8c;
+  --ri-purple-line: #6d55c4;
+  --ri-chip-bg: #eef1f7;
+  --ri-chip-fg: #3a414f;
 
   /* ── Chart series ───────────────────────────────────────────────────
-     Deliberately NOT the same values as the round accents above. The UI
-     accents (iris / orange / crimson) are picked to look good as glows
-     and badges; as adjacent lines on a chart, orange and crimson fail
-     colourblind separation outright (ΔE 5.9 deutan) and neither clears
-     3:1 against a white plot surface. These three are the re-stepped
-     versions that pass: distinct hue families, inside the mode's
-     lightness band, >=3:1 on the surface. Dark mode gets its own steps
-     rather than a lightened flip -- validated against the dark surface.
-     "Overall" is deliberately absent: it's the aggregate of the other
-     three, so it renders as an emphasis line in ink, not a fourth peer. */
+     Deliberately NOT the round accents above. As adjacent lines on a
+     chart, the tech orange and stress crimson fail colourblind
+     separation outright (ΔE 5.9 deutan, against a target of >=8) and
+     neither clears 3:1 on a white plot surface. These are the re-stepped
+     values that pass every check, with their own dark-mode steps rather
+     than a lightened flip. "Overall" is absent on purpose: it is the
+     aggregate of the other three, so it renders in ink, not as a fourth
+     peer hue. */
   --ri-series-hr: #4f5fe8;
   --ri-series-tech: #b45309;
   --ri-series-stress: #a21caf;
@@ -114,59 +86,41 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ri-azure: #38bdf8;
-    --ri-cyan: #22d3ee;
-    --ri-cobalt: #60a5fa;
-    --ri-indigo: #818cf8;
-    --ri-iris: #7b8aff;
-    --ri-violet: #a78bfa;
-    --ri-orchid: #e879f9;
-    --ri-magenta: #f472b6;
-    --ri-coral: #fda4af;
-    --ri-amber: #fbbf24;
-    --ri-crimson: #fb7185;
+    --ri-page-bg: #101216;
+    --ri-surface: #171a20;
+    --ri-surface-alt: #1c2027;
+    --ri-surface-mute: #21252d;
+    --ri-border: #2a2f39;
+    --ri-border-strong: #3a4150;
+    --ri-text: #e8eaf0;
+    --ri-text-mute: #98a0ae;
+    --ri-track: #272c35;
 
-    --ri-page-bg: #080a13;
-    --ri-surface: #141824;
-    --ri-surface-alt: #191e2c;
-    --ri-surface-mute: #1d2230;
-    --ri-border: #2c3346;
-    --ri-text: #e9ecf7;
-    --ri-text-mute: #98a1b8;
-    --ri-track: #272d3d;
+    --ri-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+    --ri-shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.45), 0 10px 24px rgba(0, 0, 0, 0.4);
 
-    --ri-glass: rgba(22, 26, 39, 0.66);
-    --ri-glass-strong: rgba(22, 26, 39, 0.86);
-    --ri-glass-border: rgba(255, 255, 255, 0.09);
+    --ri-accent: #8b9bff;
+    --ri-accent-hover: #a3b0ff;
+    --ri-accent-soft: #1e2340;
 
-    --ri-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px rgba(0, 0, 0, 0.42);
-    --ri-card-shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.45), 0 22px 52px rgba(0, 0, 0, 0.55);
+    --ri-hr: #8b9bff;
+    --ri-tech: #e08b3c;
+    --ri-stress: #f07185;
 
-    /* Dark ground swallows colour, so the field runs hotter here, and
-       `screen` is the right blend: overlaps add towards light, which is
-       how actual aurorae and stage lighting behave. */
-    --ri-aurora-blend: screen;
-    --ri-aurora-opacity: 0.95;
-    --ri-prism-opacity: 0.34;
-    --ri-grain-opacity: 0.05;
-
-    --ri-tech: #fb923c;
-    --ri-stress: #fb6d85;
-
-    --ri-good-bg: #10301f;
-    --ri-good-fg: #8ee6b0;
-    --ri-good-line: #2fa060;
-    --ri-warn-bg: #33210f;
-    --ri-warn-fg: #f5c08e;
-    --ri-warn-line: #e07b32;
-    --ri-info-bg: #171f3d;
-    --ri-info-fg: #b3c1ff;
-    --ri-info-line: #6b86ff;
-    --ri-purple-bg: #221a3d;
-    --ri-purple-fg: #c9b5ff;
-    --ri-purple-line: #8e6bff;
-    --ri-chip-bg: #212844;
-    --ri-chip-fg: #b6c2ff;
+    --ri-good-bg: #122c1e;
+    --ri-good-fg: #86dfa8;
+    --ri-good-line: #35a565;
+    --ri-warn-bg: #2e2110;
+    --ri-warn-fg: #edb87f;
+    --ri-warn-line: #d4802f;
+    --ri-info-bg: #1e2340;
+    --ri-info-fg: #b0bcff;
+    --ri-info-line: #7386ff;
+    --ri-purple-bg: #241d3a;
+    --ri-purple-fg: #c2b0f0;
+    --ri-purple-line: #8b73d8;
+    --ri-chip-bg: #242932;
+    --ri-chip-fg: #b6bdcb;
 
     --ri-series-hr: #6b78ee;
     --ri-series-tech: #c4650f;
@@ -185,24 +139,16 @@
   --color-ri-surface-alt: var(--ri-surface-alt);
   --color-ri-surface-mute: var(--ri-surface-mute);
   --color-ri-border: var(--ri-border);
+  --color-ri-border-strong: var(--ri-border-strong);
   --color-ri-text: var(--ri-text);
   --color-ri-text-mute: var(--ri-text-mute);
   --color-ri-track: var(--ri-track);
 
   --color-ri-accent: var(--ri-accent);
+  --color-ri-accent-soft: var(--ri-accent-soft);
+  --color-ri-hr: var(--ri-hr);
   --color-ri-tech: var(--ri-tech);
   --color-ri-stress: var(--ri-stress);
-
-  --color-ri-azure: var(--ri-azure);
-  --color-ri-cyan: var(--ri-cyan);
-  --color-ri-cobalt: var(--ri-cobalt);
-  --color-ri-indigo: var(--ri-indigo);
-  --color-ri-iris: var(--ri-iris);
-  --color-ri-violet: var(--ri-violet);
-  --color-ri-orchid: var(--ri-orchid);
-  --color-ri-magenta: var(--ri-magenta);
-  --color-ri-coral: var(--ri-coral);
-  --color-ri-amber: var(--ri-amber);
 
   --color-ri-good-bg: var(--ri-good-bg);
   --color-ri-good-fg: var(--ri-good-fg);
@@ -214,10 +160,9 @@
   --color-ri-info-fg: var(--ri-info-fg);
   --color-ri-info-line: var(--ri-info-line);
 
-  /* These four and the two chip tokens were being used by ReportView and
-     the landing page's feature cards but were never registered here --
-     so `bg-ri-purple-bg`, `text-ri-chip-fg` and friends generated no CSS
-     at all and those elements rendered unstyled. */
+  /* These six were used by ReportView and the landing page but were never
+     registered here, so `bg-ri-purple-bg`, `text-ri-chip-fg` and friends
+     generated no CSS at all and those elements rendered unstyled. */
   --color-ri-purple-bg: var(--ri-purple-bg);
   --color-ri-purple-fg: var(--ri-purple-fg);
   --color-ri-purple-line: var(--ri-purple-line);
@@ -231,632 +176,121 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  /* Deliberately NOT `overflow-x: hidden` here. The layout gives <html>
-     h-full and <body> min-h-full, so any overflow value other than
-     `visible` turns body into its own scroll container -- which detaches
-     the sticky header and leaves a dead band above it. The aurora's
-     blobs are already clipped by .ri-aurora's own `overflow: hidden`,
-     so nothing needs clipping at the body level. */
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Ambient layer — the aurora field
+   Typography
    ───────────────────────────────────────────────────────────────────────
-   Eight soft colour fields on a fixed, non-interactive layer, each on its
-   own slow prime-ish duration so they never visibly re-sync into a loop.
-
-   Two things make the colour abstract rather than merely tinted:
-
-   1. The fields BLEND with each other (screen on dark, multiply on light)
-      instead of stacking opaquely. Where indigo crosses coral you get a
-      colour that is in neither -- so the page shows far more hues than the
-      eleven in the ramp, and the set changes as the fields drift across
-      one another.
-   2. Each field slowly rotates its own hue, on a different period from its
-      drift. The overlaps therefore never resolve to the same colour twice,
-      and no single frame is the "real" palette.
-
-   Pure CSS: no canvas, no library, no per-frame JS.
+   Inter's default tracking is tuned for UI text at small sizes; at
+   display sizes it reads loose. Tightening as size increases is most of
+   what separates a considered heading from a default one.
    ═══════════════════════════════════════════════════════════════════════ */
 
-.ri-aurora {
-  position: fixed;
-  inset: 0;
-  z-index: -2;
-  pointer-events: none;
-  overflow: hidden;
-  opacity: var(--ri-aurora-opacity);
+.ri-display {
+  font-weight: 680;
+  letter-spacing: -0.033em;
+  line-height: 1.06;
+  text-wrap: balance;
 }
 
-.ri-aurora__blob {
-  position: absolute;
-  border-radius: 9999px;
-  mix-blend-mode: var(--ri-aurora-blend);
-  will-change: transform;
-
-  /* A linear alpha ramp still ends abruptly enough that the eye picks out
-     a circle (Mach banding on the derivative, not the value). A static
-     blur smooths that away, and because it is NOT animated the browser
-     rasterises it once and then only re-composites -- the expensive case
-     is animating `filter`, which re-runs the convolution every frame. */
-  filter: blur(70px);
-
-  /* One gradient for all eight fields; each only sets --ri-blob-hue.
-     The alpha ramp is written out as explicit color-mix stops rather than
-     letting the browser interpolate `<colour> -> transparent`, because
-     `transparent` is transparent BLACK: interpolating to it in sRGB drags
-     the midtones toward grey and leaves a visible dirty ring at the edge
-     of each field. Mixing the field's own hue down in alpha keeps the hue
-     constant all the way out, so the edge genuinely disappears -- which is
-     what the 90px blur was previously papering over. */
-  background: radial-gradient(
-    circle at var(--ri-blob-x, 50%) var(--ri-blob-y, 50%),
-    var(--ri-blob-hue) 0%,
-    color-mix(in srgb, var(--ri-blob-hue) 60%, transparent) 30%,
-    color-mix(in srgb, var(--ri-blob-hue) 28%, transparent) 52%,
-    color-mix(in srgb, var(--ri-blob-hue) 10%, transparent) 70%,
-    color-mix(in srgb, var(--ri-blob-hue) 0%, transparent) 88%
-  );
+.ri-title {
+  font-weight: 640;
+  letter-spacing: -0.021em;
+  line-height: 1.2;
 }
 
-/* Field geometry. Sizes and origins vary a lot on purpose -- evenly spaced
-   equal circles read as a pattern, which is the opposite of what an
-   ambient layer should do. */
-.ri-aurora__blob--1 {
-  width: 48vw; height: 48vw; min-width: 340px; min-height: 340px;
-  top: -14vh; left: -10vw;
-  --ri-blob-hue: var(--ri-indigo);
-  --ri-blob-x: 38%;
-  --ri-blob-y: 38%;
-  animation: ri-drift-1 34s ease-in-out infinite;
-}
-.ri-aurora__blob--2 {
-  width: 42vw; height: 42vw; min-width: 300px; min-height: 300px;
-  top: 2vh; right: -12vw;
-  --ri-blob-hue: var(--ri-violet);
-  --ri-blob-x: 60%;
-  --ri-blob-y: 40%;
-  animation: ri-drift-2 43s ease-in-out infinite, ri-hue-b 73s linear infinite;
-}
-.ri-aurora__blob--3 {
-  width: 40vw; height: 40vw; min-width: 280px; min-height: 280px;
-  bottom: -16vh; left: 16vw;
-  --ri-blob-hue: var(--ri-cyan);
-  --ri-blob-x: 45%;
-  --ri-blob-y: 55%;
-  animation: ri-drift-3 51s ease-in-out infinite;
-}
-.ri-aurora__blob--4 {
-  width: 32vw; height: 32vw; min-width: 240px; min-height: 240px;
-  bottom: 4vh; right: 4vw;
-  --ri-blob-hue: var(--ri-magenta);
-  --ri-blob-x: 50%;
-  --ri-blob-y: 50%;
-  animation: ri-drift-4 39s ease-in-out infinite, ri-hue-b 67s linear infinite;
-}
-.ri-aurora__blob--5 {
-  width: 36vw; height: 36vw; min-width: 250px; min-height: 250px;
-  top: 30vh; left: 30vw;
-  --ri-blob-hue: var(--ri-orchid);
-  --ri-blob-x: 50%;
-  --ri-blob-y: 45%;
-  animation: ri-drift-5 47s ease-in-out infinite;
-}
-.ri-aurora__blob--6 {
-  width: 28vw; height: 28vw; min-width: 200px; min-height: 200px;
-  top: -6vh; left: 42vw;
-  --ri-blob-hue: var(--ri-azure);
-  --ri-blob-x: 50%;
-  --ri-blob-y: 50%;
-  animation: ri-drift-6 57s ease-in-out infinite, ri-hue-b 83s linear infinite;
-}
-.ri-aurora__blob--7 {
-  width: 26vw; height: 26vw; min-width: 190px; min-height: 190px;
-  bottom: 22vh; left: -6vw;
-  --ri-blob-hue: var(--ri-coral);
-  --ri-blob-x: 50%;
-  --ri-blob-y: 50%;
-  animation: ri-drift-7 63s ease-in-out infinite;
-}
-.ri-aurora__blob--8 {
-  width: 24vw; height: 24vw; min-width: 180px; min-height: 180px;
-  top: 52vh; right: 22vw;
-  --ri-blob-hue: var(--ri-amber);
-  --ri-blob-x: 50%;
-  --ri-blob-y: 50%;
-  animation: ri-drift-8 41s ease-in-out infinite, ri-hue-b 97s linear infinite;
+.ri-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ri-text-mute);
 }
 
-/* A very slow conic sweep behind everything. A conic gradient cycles the
-   whole ramp around a point, so it lays down transitions the radial fields
-   can't make on their own -- and rotating it means they're lit from a
-   different part of the spectrum over time. Masked to a soft disc so it
-   never shows a hard edge or the seam where the cone closes. */
-.ri-aurora__prism {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 150vmax;
-  height: 150vmax;
-  margin: -75vmax 0 0 -75vmax;
-  border-radius: 9999px;
-  opacity: var(--ri-prism-opacity);
-  mix-blend-mode: var(--ri-aurora-blend);
-  background: conic-gradient(
-    from 0deg,
-    var(--ri-azure),
-    var(--ri-cobalt),
-    var(--ri-indigo),
-    var(--ri-iris),
-    var(--ri-violet),
-    var(--ri-orchid),
-    var(--ri-magenta),
-    var(--ri-coral),
-    var(--ri-amber),
-    var(--ri-coral),
-    var(--ri-magenta),
-    var(--ri-orchid),
-    var(--ri-violet),
-    var(--ri-iris),
-    var(--ri-indigo),
-    var(--ri-cobalt),
-    var(--ri-azure)
-  );
-  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0%, transparent 62%);
-  mask-image: radial-gradient(circle at 50% 50%, #000 0%, transparent 62%);
-  filter: blur(60px);
-  animation: ri-prism-spin 180s linear infinite;
-  will-change: transform;
-}
-
-/* Film grain over the whole field. Large flat colour gradients band badly
-   on 8-bit displays; a little noise breaks the bands up. */
-.ri-aurora__grain {
-  position: absolute;
-  inset: -50%;
-  opacity: var(--ri-grain-opacity);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-/* No blur() in these keyframes, deliberately. The fields are radial
-   gradients that already fade to transparent well inside their own box, so
-   a large blur on top of that changes the look very little -- but it costs
-   a great deal: animating `filter` re-runs the whole filter chain every
-   frame, and a 90px blur across eight ~600px layers is enough to drop
-   frames on mid-range hardware and most phones. Hue and saturation are
-   cheap per-pixel operations, so the colour keeps evolving at a fraction
-   of the cost. The prism keeps its blur -- a conic gradient has a genuine
-   hard seam that needs softening, and it is one layer, not eight. */
-/* Only four of the eight fields rotate their hue, and they must restate
-   the blur because a `filter` animation replaces the whole property. The
-   other four hold a fixed hue on a static, rasterise-once blur. That is
-   the compromise: half the per-frame blur cost, while the mixing still
-   evolves -- what makes an overlap change colour is the two fields moving
-   RELATIVE to each other, so rotating half of them is enough. Rotating
-   all eight in lockstep would actually look more static, not less. */
-@keyframes ri-hue-b {
-  0%   { filter: blur(70px) hue-rotate(0deg) saturate(1.1); }
-  50%  { filter: blur(70px) hue-rotate(-36deg) saturate(1.3); }
-  100% { filter: blur(70px) hue-rotate(0deg) saturate(1.1); }
-}
-
-@keyframes ri-prism-spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-
-@keyframes ri-drift-1 {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  33%      { transform: translate3d(8vw, 6vh, 0) scale(1.12); }
-  66%      { transform: translate3d(-4vw, 10vh, 0) scale(0.94); }
-}
-@keyframes ri-drift-2 {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  40%      { transform: translate3d(-9vw, 8vh, 0) scale(1.15); }
-  75%      { transform: translate3d(-3vw, -5vh, 0) scale(0.9); }
-}
-@keyframes ri-drift-3 {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  45%      { transform: translate3d(10vw, -8vh, 0) scale(0.9); }
-  80%      { transform: translate3d(-6vw, -3vh, 0) scale(1.14); }
-}
-@keyframes ri-drift-4 {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50%      { transform: translate3d(-7vw, -9vh, 0) scale(1.18); }
-}
-@keyframes ri-drift-5 {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(0.95); }
-  35%      { transform: translate3d(-12vw, 6vh, 0) scale(1.2); }
-  70%      { transform: translate3d(9vw, -7vh, 0) scale(0.88); }
-}
-@keyframes ri-drift-6 {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); }
-  50%      { transform: translate3d(6vw, 14vh, 0) scale(0.9); }
-}
-@keyframes ri-drift-7 {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  40%      { transform: translate3d(11vw, -10vh, 0) scale(1.22); }
-  80%      { transform: translate3d(4vw, 5vh, 0) scale(0.92); }
-}
-@keyframes ri-drift-8 {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1.08); }
-  45%      { transform: translate3d(-10vw, 7vh, 0) scale(0.92); }
+/* Caps the measure at roughly 68 characters -- a paragraph set to the
+   full container width is hard to track from line to line. */
+.ri-prose {
+  max-width: 34rem;
+  text-wrap: pretty;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Glass surfaces
+   Motion
+   ───────────────────────────────────────────────────────────────────────
+   Motion marks a state change and then stops. Nothing here loops except
+   the two genuinely live states (recording, and an in-flight model call).
+   A page that moves permanently gives the eye nowhere to rest, and makes
+   the things that SHOULD move -- a question arriving, a score landing --
+   stop registering as events.
    ═══════════════════════════════════════════════════════════════════════ */
 
-.ri-glass {
-  background: var(--ri-glass);
-  backdrop-filter: blur(var(--ri-glass-blur)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--ri-glass-blur)) saturate(150%);
-  border: 1px solid var(--ri-glass-border);
-  box-shadow: var(--ri-card-shadow);
-}
-
-.ri-glass-strong {
-  background: var(--ri-glass-strong);
-  backdrop-filter: blur(var(--ri-glass-blur)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--ri-glass-blur)) saturate(160%);
-}
-
-/* A hairline of moving spectrum along the top edge of a card. Uses a
-   masked pseudo-element rather than `border-image` so it composites
-   correctly over the blurred glass underneath. */
-.ri-edge-glow {
-  position: relative;
-}
-.ri-edge-glow::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 1px;
-  border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--ri-azure),
-    var(--ri-indigo),
-    var(--ri-violet),
-    var(--ri-orchid),
-    var(--ri-magenta),
-    var(--ri-coral),
-    var(--ri-amber),
-    transparent
-  );
-  background-size: 200% 100%;
-  animation: ri-pan 9s linear infinite;
-  opacity: 0.75;
-  pointer-events: none;
-}
-
-/* Iridescent hairline around the whole card, not just its top edge.
-   Painted as a gradient behind the element and punched out with a
-   mask-composite ring, because border-image cannot follow a border-radius
-   and a gradient border faked with a wrapper div breaks the backdrop-blur
-   underneath it. */
-.ri-iridescent {
-  position: relative;
-}
-.ri-iridescent::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1.5px;
-  background: linear-gradient(
-    130deg,
-    var(--ri-azure),
-    var(--ri-indigo),
-    var(--ri-violet),
-    var(--ri-orchid),
-    var(--ri-magenta),
-    var(--ri-coral),
-    var(--ri-amber),
-    var(--ri-azure)
-  );
-  background-size: 260% 260%;
-  animation: ri-pan-diag 16s linear infinite;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0.9;
-  pointer-events: none;
-}
-
-/* Soft bloom of the same ramp just outside the ring, so the card reads as
-   lit by the field behind it rather than merely outlined. Sits on its own
-   pseudo-element at a negative z-index so it never tints the card's own
-   content or fights the backdrop-blur. */
-.ri-iridescent::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  z-index: -1;
-  border-radius: inherit;
-  background: linear-gradient(
-    130deg,
-    var(--ri-azure),
-    var(--ri-violet),
-    var(--ri-magenta),
-    var(--ri-amber)
-  );
-  background-size: 260% 260%;
-  animation: ri-pan-diag 16s linear infinite;
-  filter: blur(14px);
-  opacity: 0.32;
-  pointer-events: none;
-}
-
-@keyframes ri-pan-diag {
-  from { background-position: 0% 50%; }
-  to   { background-position: 260% 50%; }
-}
-
-/* A faint spectrum wash across a surface -- enough colour to stop a large
-   panel reading as flat grey, far too little to fight the text on it. */
-.ri-wash {
-  background-image: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--ri-azure) 10%, transparent),
-    color-mix(in srgb, var(--ri-violet) 8%, transparent) 40%,
-    color-mix(in srgb, var(--ri-magenta) 8%, transparent) 70%,
-    color-mix(in srgb, var(--ri-amber) 9%, transparent)
-  );
-}
-
-/* A soft floor of page-background behind a block of text, so body copy
-   stays readable wherever the ambient field happens to be brightest.
-   The field is at its most saturated in dark mode, and muted text over a
-   hot patch of it drops well below a usable contrast ratio -- but dimming
-   the whole field to fix one paragraph would throw away the colour
-   everywhere it is not a problem. This scrims only where text actually
-   sits, and fades out well before the block edges so there is no visible
-   rectangle. */
-.ri-legible {
-  position: relative;
-  isolation: isolate;
-}
-.ri-legible::before {
-  content: "";
-  position: absolute;
-  inset: -10% -14%;
-  z-index: -1;
-  pointer-events: none;
-  background: radial-gradient(
-    58% 58% at 50% 50%,
-    color-mix(in srgb, var(--ri-page-bg) 82%, transparent) 0%,
-    color-mix(in srgb, var(--ri-page-bg) 55%, transparent) 45%,
-    color-mix(in srgb, var(--ri-page-bg) 0%, transparent) 78%
-  );
-}
-
-/* Card that lifts and warms on hover. */
-.ri-lift {
-  transition:
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 0.32s ease;
-}
-.ri-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--ri-card-shadow-lift);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   Type treatments
-   ═══════════════════════════════════════════════════════════════════════ */
-
-/* The stop list is a palindrome on purpose. A gradient that loops by
-   running back to its first hue has to cross the whole wheel to get
-   there -- amber -> cyan swings straight through green, which is the
-   reserved "good score" colour and has no business appearing in a
-   headline. Mirroring the ramp instead means it loops seamlessly while
-   only ever travelling cyan <-> amber the short way round. */
-.ri-hero-title {
-  background: linear-gradient(
-    100deg,
-    var(--ri-azure),
-    var(--ri-cobalt),
-    var(--ri-indigo),
-    var(--ri-iris),
-    var(--ri-violet),
-    var(--ri-orchid),
-    var(--ri-magenta),
-    var(--ri-coral),
-    var(--ri-amber),
-    var(--ri-coral),
-    var(--ri-magenta),
-    var(--ri-orchid),
-    var(--ri-violet),
-    var(--ri-iris),
-    var(--ri-indigo),
-    var(--ri-cobalt),
-    var(--ri-azure)
-  );
-  background-size: 320% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: ri-pan 18s linear infinite;
-}
-
-.ri-gradient-text {
-  background: linear-gradient(
-    100deg,
-    var(--ri-azure),
-    var(--ri-iris),
-    var(--ri-violet),
-    var(--ri-orchid),
-    var(--ri-violet),
-    var(--ri-iris),
-    var(--ri-azure)
-  );
-  background-size: 240% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: ri-pan 12s linear infinite;
-}
-
-@keyframes ri-pan {
-  from { background-position: 0% 50%; }
-  to   { background-position: 200% 50%; }
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   Entrances
-   ═══════════════════════════════════════════════════════════════════════ */
-
-@keyframes ri-fade-in {
-  from { opacity: 0; transform: translateY(8px); }
+@keyframes ri-enter {
+  from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: none; }
 }
-.ri-fade-in {
-  animation: ri-fade-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+.ri-enter {
+  animation: ri-enter 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes ri-rise {
-  from { opacity: 0; transform: translateY(16px) scale(0.985); }
-  to   { opacity: 1; transform: none; }
-}
-.ri-rise {
-  animation: ri-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
+/* Short, tight stagger. Long cascades look like a slideshow transition. */
+.ri-stagger > * { animation: ri-enter 0.26s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.ri-stagger > *:nth-child(2) { animation-delay: 0.03s; }
+.ri-stagger > *:nth-child(3) { animation-delay: 0.06s; }
+.ri-stagger > *:nth-child(4) { animation-delay: 0.09s; }
+.ri-stagger > *:nth-child(n + 5) { animation-delay: 0.12s; }
 
-/* Children enter one after another. Capped at 8 -- past that the last
-   item waits long enough that the page feels slow rather than crafted. */
-.ri-stagger > * {
-  animation: ri-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.ri-stagger > *:nth-child(1) { animation-delay: 0.04s; }
-.ri-stagger > *:nth-child(2) { animation-delay: 0.10s; }
-.ri-stagger > *:nth-child(3) { animation-delay: 0.16s; }
-.ri-stagger > *:nth-child(4) { animation-delay: 0.22s; }
-.ri-stagger > *:nth-child(5) { animation-delay: 0.28s; }
-.ri-stagger > *:nth-child(6) { animation-delay: 0.34s; }
-.ri-stagger > *:nth-child(7) { animation-delay: 0.40s; }
-.ri-stagger > *:nth-child(n + 8) { animation-delay: 0.46s; }
-
-@keyframes ri-pop {
-  0%   { opacity: 0; transform: scale(0.82); }
-  60%  { transform: scale(1.04); }
-  100% { opacity: 1; transform: scale(1); }
-}
-.ri-pop {
-  animation: ri-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   Interaction accents
-   ═══════════════════════════════════════════════════════════════════════ */
-
-/* A light sweeps across the button on hover. */
-.ri-sheen {
-  position: relative;
-  overflow: hidden;
-  isolation: isolate;
-}
-.ri-sheen::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    110deg,
-    transparent 25%,
-    rgba(255, 255, 255, 0.42) 50%,
-    transparent 75%
-  );
-  transform: translateX(-100%);
-  pointer-events: none;
-}
-.ri-sheen:hover::after,
-.ri-sheen:focus-visible::after {
-  animation: ri-sweep 0.85s ease;
-}
-@keyframes ri-sweep {
-  to { transform: translateX(100%); }
-}
-
-/* Live recording indicator — an expanding ring, not just a red dot. */
-@keyframes ri-pulse-ring {
-  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ri-stress) 55%, transparent); }
-  70%  { box-shadow: 0 0 0 12px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
-}
-.ri-pulse-ring {
-  animation: ri-pulse-ring 1.6s cubic-bezier(0.66, 0, 0, 1) infinite;
-}
-
-/* Three-dot "thinking" indicator for model calls. */
-@keyframes ri-bounce-dot {
-  0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
-  40%           { transform: translateY(-5px); opacity: 1; }
-}
-.ri-dot {
-  animation: ri-bounce-dot 1.25s ease-in-out infinite;
-}
-.ri-dot:nth-child(2) { animation-delay: 0.16s; }
-.ri-dot:nth-child(3) { animation-delay: 0.32s; }
-
-/* Indeterminate progress sliver — used while a question is generating. */
-@keyframes ri-track-slide {
-  from { transform: translateX(-100%); }
-  to   { transform: translateX(400%); }
-}
-.ri-track-slide {
-  animation: ri-track-slide 1.5s cubic-bezier(0.65, 0, 0.35, 1) infinite;
-}
-
-/* Score rings draw themselves in on mount (stroke-dashoffset animated
-   from a CSS variable the component sets per-score). */
+/* The score ring sweeps to its value once, on arrival. */
 @keyframes ri-draw-ring {
   from { stroke-dashoffset: var(--ri-ring-len); }
   to   { stroke-dashoffset: var(--ri-ring-offset); }
 }
 .ri-ring-draw {
-  animation: ri-draw-ring 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ri-draw-ring 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Focus ring shared by every interactive element, so keyboard users get
-   one consistent, high-contrast affordance instead of per-component
-   guesses. */
+/* Recording is the one genuinely live state in the product, so it is the
+   one thing allowed to pulse continuously: it means "still capturing". */
+@keyframes ri-rec {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+.ri-rec { animation: ri-rec 1.4s ease-in-out infinite; }
+
+/* Indeterminate bar for model calls, whose duration genuinely is unknown. */
+@keyframes ri-indeterminate {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(400%); }
+}
+.ri-indeterminate { animation: ri-indeterminate 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
+
+/* One focus treatment for every interactive element, so keyboard users
+   get a single consistent affordance instead of per-component guesses. */
 .ri-focus:focus-visible {
   outline: 2px solid var(--ri-accent);
   outline-offset: 2px;
+  border-radius: 6px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Scrollbar — the default light scrollbar on a dark aurora is a bright
-   stripe down the edge of the page, which is the first thing your eye
-   goes to. This tones it into the palette.
+   Scrollbar
    ═══════════════════════════════════════════════════════════════════════ */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--ri-border) transparent;
+  scrollbar-color: var(--ri-border-strong) transparent;
 }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb {
-  background: var(--ri-border);
+  background: var(--ri-border-strong);
   border-radius: 9999px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-*::-webkit-scrollbar-thumb:hover {
-  background: var(--ri-text-mute);
+  border: 3px solid transparent;
   background-clip: content-box;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
    Reduced motion
-   ───────────────────────────────────────────────────────────────────────
-   Everything above is decoration, so for users who ask for less motion
-   it all stops -- including the aurora drift, which is the largest
-   moving thing on screen and the most likely to cause trouble. The
-   layout, colour and depth all survive; only the movement goes.
    ═══════════════════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -866,18 +300,5 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
-  }
-  .ri-aurora__blob {
-    animation: none !important;
-  }
-  .ri-aurora__prism {
-    animation: none !important;
-  }
-  /* The gradient-clipped headings are transparent text that only becomes
-     visible because the gradient paints it -- killing the animation is
-     fine, but they still need their gradient rendered. */
-  .ri-hero-title,
-  .ri-gradient-text {
-    background-position: 30% 50%;
   }
 }

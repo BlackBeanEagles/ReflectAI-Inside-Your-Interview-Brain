@@ -61,11 +61,8 @@ export default function AtsScorePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-extrabold mb-1">
-          <span aria-hidden>✅</span>{" "}
-          <span className="ri-hero-title">ATS Score</span>
-        </h1>
-        <p className="text-ri-text-mute text-sm">
+        <h1 className="ri-display text-3xl">ATS Score</h1>
+        <p className="ri-prose mt-2 text-ri-text-mute text-sm">
           Check how a resume holds up against a specific job posting, the way a real ATS/resume
           screener actually evaluates candidates — weighted categories, each fully traceable.
           This is <b>not</b> an AI-guessed number: the same inputs always produce the same score.
@@ -121,7 +118,7 @@ export default function AtsScorePage() {
                 : hasJobDescription
                   ? "Scoring resume against job description…"
                   : "Scoring resume…"
-              : "✅ Check ATS Score"}
+              : "Check ATS Score"}
           </PrimaryButton>
         </div>
       </Card>
@@ -166,7 +163,7 @@ export default function AtsScorePage() {
 
           {result.recruiter_take && (
             <div className="bg-ri-purple-bg border border-ri-purple-line rounded-xl p-4 text-sm mb-5">
-              <b>🗣️ Recruiter&apos;s first read (AI-generated, subjective — not part of the score above)</b>
+              <b>Recruiter&apos;s first read (AI-generated, subjective — not part of the score above)</b>
               <p className="mt-1">{result.recruiter_take}</p>
             </div>
           )}
@@ -188,7 +185,7 @@ export default function AtsScorePage() {
                 {result.keyword_importance.slice(0, 12).map((kw, i) => (
                   <div key={i} className="flex items-center gap-3 text-sm">
                     <span className={`w-24 sm:w-40 shrink-0 truncate ${kw.matched ? "" : "text-ri-text-mute"}`}>
-                      {kw.matched ? "✅" : "❌"} {kw.keyword}
+                      {kw.matched ? "" : ""} {kw.keyword}
                     </span>
                     <div className="flex-1 h-2 rounded-full bg-ri-track overflow-hidden">
                       <div
@@ -204,14 +201,14 @@ export default function AtsScorePage() {
 
           {result.improvement_plan.length > 0 && (
             <div>
-              <h3 className="font-bold text-sm mb-1">📈 Resume ROI — ranked by expected score gain</h3>
+              <h3 className="font-bold text-sm mb-1">Resume ROI — ranked by expected score gain</h3>
               <p className="text-xs text-ri-text-mute mb-3">
                 Each estimated gain is computed exactly from that keyword&apos;s or check&apos;s share of its
                 category&apos;s weight — not a separate guess. Fix the top of this list first.
               </p>
               <ul className="space-y-2">
                 {result.improvement_plan.map((item, i) => {
-                  const icon = item.priority === "high" ? "🔴" : item.priority === "medium" ? "🟡" : "🟢";
+                  const icon = item.priority === "high" ? "" : item.priority === "medium" ? "" : "";
                   const style =
                     item.priority === "high"
                       ? "bg-ri-warn-bg border-ri-warn-line"
