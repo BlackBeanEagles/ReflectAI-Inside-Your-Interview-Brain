@@ -10,7 +10,10 @@ import {
   Alert,
   Card,
   PrimaryButton,
+  ProgressTrack,
+  ROUND_ACCENT,
   RoundBadge,
+  RoundProgress,
   ScorePanel,
   SecondaryButton,
   Spinner,
@@ -465,8 +468,13 @@ function InterviewSessionInner() {
   if (phase === "report" && report) {
     return (
       <div className="space-y-6 ri-fade-in">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-2xl font-extrabold">Final Report</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ri-text-mute">
+              Session complete
+            </p>
+            <h1 className="ri-hero-title text-3xl font-extrabold">Final Report</h1>
+          </div>
           <div className="flex gap-2">
             <SecondaryButton onClick={handleDownloadPdf} disabled={pdfLoading}>
               {pdfLoading ? "Preparing…" : "⬇️ Download PDF"}
@@ -475,7 +483,7 @@ function InterviewSessionInner() {
           </div>
         </div>
         {reportError && <Alert kind="error">{reportError}</Alert>}
-        <Card>
+        <Card glow>
           <ReportView report={report} />
         </Card>
       </div>
@@ -486,14 +494,23 @@ function InterviewSessionInner() {
   if (phase === "interview") {
     return (
       <div className="space-y-5 ri-fade-in">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">Question {count}</h1>
-            <p className="text-xs text-ri-text-mute mt-0.5">
-              {storedCount} answer{storedCount !== 1 ? "s" : ""} saved to this session
-            </p>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h1 className="text-xl font-bold">
+                Question <span className="ri-gradient-text">{count}</span>
+                <span className="text-ri-text-mute font-medium"> / {MAX_QUESTIONS}</span>
+              </h1>
+              <p className="mt-0.5 text-xs text-ri-text-mute">
+                {storedCount} answer{storedCount !== 1 ? "s" : ""} saved to this session
+              </p>
+            </div>
+            <SecondaryButton onClick={handleResetInterview}>↩ Reset</SecondaryButton>
           </div>
-          <SecondaryButton onClick={handleResetInterview}>↩ Reset</SecondaryButton>
+          {/* Turns "how much longer is this?" from a guess into a glance --
+              and the bar takes the round's colour, so the escalation into
+              technical and stress is visible in the chrome, not just the badge. */}
+          <RoundProgress current={count} total={MAX_QUESTIONS} round={round} />
         </div>
 
         {transitionMessage && (
@@ -522,38 +539,60 @@ function InterviewSessionInner() {
         ) : interviewError ? (
           <Alert kind="error">{interviewError}</Alert>
         ) : nextLoading && !currentQuestion ? (
-          <Card>
+          <Card glow>
             <Spinner label="Generating question… (first one takes longest while the model warms up)" />
+            <div className="mt-3">
+              <ProgressTrack />
+            </div>
           </Card>
         ) : currentQuestion ? (
-          <Card key={count} className="ri-fade-in">
+          <Card key={count} glow className="ri-rise">
             <RoundBadge round={round} />
+            {/* The question panel is tinted by the active round rather than
+                picking from three hardcoded class strings, so adding a round
+                later only means adding a hue to ROUND_ACCENT. */}
             <div
-              className={`mt-3 p-4 rounded-lg border-l-4 text-base leading-relaxed ${
-                round === "stress"
-                  ? "border-ri-stress bg-ri-surface-alt"
-                  : round === "technical"
-                    ? "border-ri-tech bg-ri-surface-alt"
-                    : "border-ri-accent bg-ri-surface-alt"
-              }`}
+              className="mt-3 rounded-xl border-l-[3px] p-4 text-base leading-relaxed"
+              style={{
+                borderLeftColor: ROUND_ACCENT[round] || ROUND_ACCENT.hr,
+                background: `linear-gradient(100deg, color-mix(in srgb, ${
+                  ROUND_ACCENT[round] || ROUND_ACCENT.hr
+                } 9%, transparent), transparent 70%), var(--ri-surface-alt)`,
+              }}
             >
               {currentQuestion}
             </div>
             <button
               onClick={() => speakText(currentQuestion)}
-              className="mt-2 text-sm text-ri-accent hover:underline"
+              className="ri-focus mt-2.5 rounded-lg text-sm text-ri-accent transition-opacity hover:opacity-75"
             >
               🔊 Listen to the question
             </button>
 
             {/* Voice recording */}
-            <div className="mt-4 border border-ri-border rounded-lg p-3">
-              <p className="text-sm font-semibold mb-2">🎙️ Record your answer instead of typing</p>
-              <div className="flex items-center gap-2 flex-wrap">
+            <div className="mt-4 rounded-xl border border-ri-border bg-ri-surface-alt/40 p-3">
+              <p className="mb-2 text-sm font-semibold">🎙️ Record your answer instead of typing</p>
+              <div className="flex flex-wrap items-center gap-2">
                 {!recording ? (
                   <SecondaryButton onClick={startRecording}>● Start recording</SecondaryButton>
                 ) : (
-                  <SecondaryButton onClick={stopRecording}>■ Stop recording</SecondaryButton>
+                  <button
+                    type="button"
+                    onClick={stopRecording}
+                    className="ri-pulse-ring ri-focus flex items-center gap-2 rounded-xl border px-4 py-2.5 font-semibold transition-colors"
+                    style={{
+                      color: "var(--ri-stress)",
+                      borderColor: "color-mix(in srgb, var(--ri-stress) 45%, transparent)",
+                      background: "color-mix(in srgb, var(--ri-stress) 10%, transparent)",
+                    }}
+                  >
+                    <span
+                      aria-hidden
+                      className="inline-block h-2.5 w-2.5 rounded-sm"
+                      style={{ background: "var(--ri-stress)" }}
+                    />
+                    Stop recording
+                  </button>
                 )}
                 {audioBlob && !recording && (
                   <SecondaryButton onClick={transcribeRecording} disabled={transcribing}>
@@ -598,16 +637,24 @@ function InterviewSessionInner() {
             {evalError && <div className="mt-3"><Alert kind="error">{evalError}</Alert></div>}
 
             {evalResult && (
-              <div className="mt-5 border-t border-ri-border pt-4 space-y-3">
-                <div className="flex gap-3 flex-wrap">
+              <div className="ri-rise mt-5 space-y-4 border-t border-ri-border pt-4">
+                <div className="ri-stagger flex flex-wrap gap-3">
                   <ScorePanel label="Score" score={evalResult.final_score} />
                   {Object.entries(evalResult.scores).map(([dim, val]) => (
                     <ScorePanel key={dim} label={dim} score={val} />
                   ))}
                 </div>
-                <p className="text-sm"><b>✅ Strength:</b> {evalResult.feedback.strength}</p>
-                <p className="text-sm"><b>⚠️ Weakness:</b> {evalResult.feedback.weakness}</p>
-                <p className="text-sm"><b>💡 Improvement:</b> {evalResult.feedback.improvement}</p>
+                <div className="ri-stagger space-y-2">
+                  <FeedbackLine icon="✅" label="Strength" tone="var(--ri-good-line)">
+                    {evalResult.feedback.strength}
+                  </FeedbackLine>
+                  <FeedbackLine icon="⚠️" label="Weakness" tone="var(--ri-warn-line)">
+                    {evalResult.feedback.weakness}
+                  </FeedbackLine>
+                  <FeedbackLine icon="💡" label="Improvement" tone="var(--ri-violet)">
+                    {evalResult.feedback.improvement}
+                  </FeedbackLine>
+                </div>
                 <PrimaryButton onClick={handleNext} disabled={nextLoading}>
                   {nextLoading ? "Loading next question…" : "Next Question →"}
                 </PrimaryButton>
@@ -621,26 +668,33 @@ function InterviewSessionInner() {
 
   // ── Render: setup phase ─────────────────────────────────────────────────
   return (
-    <div className="space-y-6 ri-fade-in">
-      <div className="text-center py-4">
-        <h1 className="text-4xl font-extrabold ri-hero-title mb-3">
+    <div className="space-y-7 ri-fade-in">
+      <div className="py-6 text-center sm:py-10">
+        <span className="ri-rise mb-5 inline-flex items-center gap-2 rounded-full border border-ri-border bg-ri-surface/60 px-3.5 py-1.5 text-xs font-medium text-ri-text-mute backdrop-blur-sm">
+          <span
+            className="inline-block h-1.5 w-1.5 rounded-full"
+            style={{ background: "var(--ri-cyan)", boxShadow: "0 0 8px var(--ri-cyan)" }}
+          />
+          Adaptive AI interviewer · voice or text
+        </span>
+        <h1 className="ri-hero-title mx-auto mb-4 max-w-3xl text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-6xl">
           Practice the interview before it counts
         </h1>
-        <p className="text-ri-text-mute max-w-xl mx-auto">
+        <p className="mx-auto max-w-xl text-ri-text-mute sm:text-lg">
           Paste or upload your resume and get a full adaptive mock interview — HR warm-up,
           technical questions tailored to your skills, and a stress round if you need the
           pressure-testing. Every answer gets instant AI feedback.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <FeatureCard icon="💬" title="HR round" desc="2 warm-up behavioural questions" tone="info" />
-        <FeatureCard icon="🛠️" title="Technical round" desc="Adaptive difficulty from your resume" tone="warn" />
-        <FeatureCard icon="🔥" title="Stress round" desc="Rapid-fire if scores dip" tone="purple" />
-        <FeatureCard icon="📊" title="Final report" desc="Scores, patterns, cognitive profile" tone="good" />
+      <div className="ri-stagger grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <FeatureCard icon="💬" title="HR round" desc="2 warm-up behavioural questions" tone="azure" />
+        <FeatureCard icon="🛠️" title="Technical round" desc="Adaptive difficulty from your resume" tone="indigo" />
+        <FeatureCard icon="🔥" title="Stress round" desc="Rapid-fire if scores dip" tone="orchid" />
+        <FeatureCard icon="📊" title="Final report" desc="Scores, patterns, cognitive profile" tone="coral" />
       </div>
 
-      <Card>
+      <Card glow iridescent>
         {setupError && (
           <div className="mb-4">
             <Alert kind="error">{setupError}</Alert>
@@ -663,7 +717,9 @@ function InterviewSessionInner() {
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border border-ri-border bg-ri-surface-mute text-sm"
+              className="w-full cursor-pointer rounded-xl border border-ri-border bg-ri-surface-mute/70 px-3.5 py-2.5 text-sm
+                transition-all duration-200 focus:border-ri-accent focus:bg-ri-surface focus:outline-none
+                focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--ri-accent)_16%,transparent)]"
             >
               {ROLE_PRESETS.map((r) => (
                 <option key={r} value={r}>{r}</option>
@@ -675,7 +731,9 @@ function InterviewSessionInner() {
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border border-ri-border bg-ri-surface-mute text-sm"
+              className="w-full cursor-pointer rounded-xl border border-ri-border bg-ri-surface-mute/70 px-3.5 py-2.5 text-sm
+                transition-all duration-200 focus:border-ri-accent focus:bg-ri-surface focus:outline-none
+                focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--ri-accent)_16%,transparent)]"
             >
               {LANGUAGE_PRESETS.map((l) => (
                 <option key={l} value={l}>{l}</option>
@@ -709,12 +767,15 @@ function InterviewSessionInner() {
   );
 }
 
-const FEATURE_TONE_STYLES: Record<string, string> = {
-  info: "bg-ri-info-bg text-ri-info-fg",
-  warn: "bg-ri-warn-bg text-ri-warn-fg",
-  purple: "bg-ri-purple-bg text-ri-purple-fg",
-  good: "bg-ri-good-bg text-ri-good-fg",
-};
+// Each card pulls one pigment straight from the spectrum, so the four of
+// them read as a single gradient sampled at four points rather than four
+// unrelated status colours.
+const FEATURE_TONES = {
+  azure: "var(--ri-azure)",
+  indigo: "var(--ri-indigo)",
+  orchid: "var(--ri-orchid)",
+  coral: "var(--ri-coral)",
+} as const;
 
 function FeatureCard({
   icon,
@@ -725,15 +786,58 @@ function FeatureCard({
   icon: string;
   title: string;
   desc: string;
-  tone: "info" | "warn" | "purple" | "good";
+  tone: keyof typeof FEATURE_TONES;
 }) {
+  const hue = FEATURE_TONES[tone];
   return (
-    <div className="bg-ri-surface-alt border border-ri-border rounded-xl p-4 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[var(--ri-card-shadow)]">
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-lg mb-2.5 ${FEATURE_TONE_STYLES[tone]}`}>
+    <div
+      className="ri-lift group rounded-2xl border p-4 backdrop-blur-sm"
+      style={{
+        borderColor: `color-mix(in srgb, ${hue} 26%, transparent)`,
+        background: `linear-gradient(150deg, color-mix(in srgb, ${hue} 13%, transparent), transparent 62%), color-mix(in srgb, var(--ri-surface) 55%, transparent)`,
+      }}
+    >
+      <div
+        className="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl text-lg
+          transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6"
+        style={{
+          background: `linear-gradient(135deg, color-mix(in srgb, ${hue} 26%, transparent), color-mix(in srgb, ${hue} 8%, transparent))`,
+          boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${hue} 30%, transparent)`,
+        }}
+      >
         {icon}
       </div>
-      <div className="font-bold text-sm">{title}</div>
-      <div className="text-xs text-ri-text-mute mt-0.5">{desc}</div>
+      <div className="text-sm font-bold">{title}</div>
+      <div className="mt-0.5 text-xs text-ri-text-mute">{desc}</div>
+    </div>
+  );
+}
+
+/** One line of per-answer feedback, colour-keyed so strength / weakness /
+ *  improvement are separable at a glance instead of three identical
+ *  paragraphs of body text. */
+function FeedbackLine({
+  icon,
+  label,
+  tone,
+  children,
+}: {
+  icon: string;
+  label: string;
+  tone: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="flex items-start gap-2.5 rounded-xl border-l-[3px] bg-ri-surface-alt/50 px-3.5 py-2.5 text-sm"
+      style={{ borderLeftColor: tone }}
+    >
+      <span aria-hidden className="mt-px shrink-0">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <b style={{ color: tone }}>{label}:</b> {children}
+      </span>
     </div>
   );
 }

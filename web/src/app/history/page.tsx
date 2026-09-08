@@ -2,21 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import * as api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { friendlyError, usePageTitle } from "@/lib/hooks";
 import { Alert, Card, SecondaryButton, Spinner } from "@/components/ui";
 import type { UserReportItem } from "@/lib/types";
 import ReportView from "@/components/ReportView";
+import ScoreTrendChart from "@/components/ScoreTrendChart";
 
 export default function HistoryPage() {
   usePageTitle("History — ReflectInterview");
@@ -52,7 +44,10 @@ export default function HistoryPage() {
   if (!user) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-extrabold">📊 Interview History Dashboard</h1>
+        <h1 className="text-3xl font-extrabold">
+          <span aria-hidden>📊</span>{" "}
+          <span className="ri-hero-title">Interview History Dashboard</span>
+        </h1>
         <Alert kind="info">
           <Link href="/login" className="underline font-semibold">Log in</Link> to see score trends
           across your past sessions. Anonymous use still works everywhere else — an account just
@@ -81,7 +76,10 @@ export default function HistoryPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-extrabold mb-1">📊 Interview History Dashboard</h1>
+        <h1 className="text-3xl font-extrabold mb-1">
+          <span aria-hidden>📊</span>{" "}
+          <span className="ri-hero-title">Interview History Dashboard</span>
+        </h1>
         <p className="text-sm text-ri-text-mute">
           Showing saved sessions for <b>{user.name || user.email}</b> — only sessions you opted in
           to saving during setup appear here.
@@ -119,20 +117,7 @@ export default function HistoryPage() {
           <Card>
             <h3 className="font-bold text-sm mb-3">Score trend across your saved sessions</h3>
             {chartData.length >= 1 ? (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--ri-border)" />
-                    <XAxis dataKey="index" stroke="var(--ri-text-mute)" fontSize={12} />
-                    <YAxis domain={[0, 10]} stroke="var(--ri-text-mute)" fontSize={12} />
-                    <Tooltip contentStyle={{ background: "var(--ri-surface)", border: "1px solid var(--ri-border)" }} />
-                    <Line type="monotone" dataKey="Overall" stroke="var(--ri-accent)" strokeWidth={2} dot />
-                    <Line type="monotone" dataKey="HR" stroke="var(--ri-info-line)" strokeWidth={1.5} dot={false} />
-                    <Line type="monotone" dataKey="Technical" stroke="var(--ri-tech)" strokeWidth={1.5} dot={false} />
-                    <Line type="monotone" dataKey="Stress" stroke="var(--ri-stress)" strokeWidth={1.5} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              <ScoreTrendChart data={chartData} />
             ) : (
               <p className="text-sm text-ri-text-mute">Not enough scored sessions yet to plot a trend.</p>
             )}

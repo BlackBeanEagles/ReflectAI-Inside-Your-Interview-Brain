@@ -70,7 +70,10 @@ export default function PredictedQuestionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-extrabold mb-1">🔮 Predicted Interview Questions</h1>
+        <h1 className="text-3xl font-extrabold mb-1">
+          <span aria-hidden>🔮</span>{" "}
+          <span className="ri-hero-title">Predicted Interview Questions</span>
+        </h1>
         <p className="text-ri-text-mute text-sm">
           Get a list of interview questions you should prepare for, generated from your resume
           and/or a target role or job description. This is a <b>study tool</b> — a prep list to

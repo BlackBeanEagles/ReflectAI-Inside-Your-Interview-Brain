@@ -21,12 +21,32 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
+        {/* Ambient layer: a slow conic prism, eight drifting colour fields
+            that blend into each other, and grain -- fixed behind every
+            route. Purely decorative and non-interactive, so it is hidden
+            from assistive tech entirely. All geometry and motion live in
+            globals.css; these divs are just the surfaces to paint on. */}
+        <div className="ri-aurora" aria-hidden="true">
+          <div className="ri-aurora__prism" />
+          <div className="ri-aurora__blob ri-aurora__blob--1" />
+          <div className="ri-aurora__blob ri-aurora__blob--2" />
+          <div className="ri-aurora__blob ri-aurora__blob--3" />
+          <div className="ri-aurora__blob ri-aurora__blob--4" />
+          <div className="ri-aurora__blob ri-aurora__blob--5" />
+          <div className="ri-aurora__blob ri-aurora__blob--6" />
+          <div className="ri-aurora__blob ri-aurora__blob--7" />
+          <div className="ri-aurora__blob ri-aurora__blob--8" />
+          <div className="ri-aurora__grain" />
+        </div>
+
         <AuthProvider>
           <ResumeProvider>
             <Nav />
             <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8">{children}</main>
-            <footer className="border-t border-ri-border py-6 text-center text-xs text-ri-text-mute">
-              ReflectInterview · Adaptive multi-round interview + session report
+            <footer className="mt-4 border-t border-ri-border/60 py-6 text-center text-xs text-ri-text-mute">
+              <span className="ri-gradient-text font-semibold">ReflectInterview</span>
+              <span className="mx-2 opacity-40">·</span>
+              Adaptive multi-round interview + session report
             </footer>
           </ResumeProvider>
         </AuthProvider>

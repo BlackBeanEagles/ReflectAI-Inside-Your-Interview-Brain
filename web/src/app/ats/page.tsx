@@ -61,7 +61,10 @@ export default function AtsScorePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-extrabold mb-1">✅ ATS Score</h1>
+        <h1 className="text-3xl font-extrabold mb-1">
+          <span aria-hidden>✅</span>{" "}
+          <span className="ri-hero-title">ATS Score</span>
+        </h1>
         <p className="text-ri-text-mute text-sm">
           Check how a resume holds up against a specific job posting, the way a real ATS/resume
           screener actually evaluates candidates — weighted categories, each fully traceable.

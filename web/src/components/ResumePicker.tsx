@@ -104,7 +104,9 @@ export function ResumePicker({
           value={text}
           onChange={handleTextChange}
           placeholder={"Skills:\nPython, Django, React\n\nProjects:\nChatbot using NLP\n\nExperience:\nInternship"}
-          rows={7}
+          // The placeholder is 8 lines; at 7 rows its last line is clipped,
+          // which reads as a broken field rather than an example.
+          rows={8}
         />
       ) : (
         <div>
