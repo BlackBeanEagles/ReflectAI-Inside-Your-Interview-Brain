@@ -234,12 +234,18 @@ export function TextArea({
   onChange,
   placeholder,
   rows = 6,
+  onSubmit,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   rows?: number;
+  /** Fired on Ctrl/Cmd+Enter. Plain Enter still inserts a newline -- these
+   *  are multi-paragraph answers, so Enter-to-submit would be hostile. */
+  onSubmit?: () => void;
+  hint?: React.ReactNode;
 }) {
   return (
     <label className="block">
@@ -247,10 +253,21 @@ export function TextArea({
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={
+          onSubmit
+            ? (e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  e.preventDefault();
+                  onSubmit();
+                }
+              }
+            : undefined
+        }
         placeholder={placeholder}
         rows={rows}
         className={`${FIELD_CLASS} resize-y leading-relaxed`}
       />
+      {hint && <span className="mt-1.5 block text-xs text-ri-text-mute">{hint}</span>}
     </label>
   );
 }

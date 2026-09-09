@@ -13,10 +13,31 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://reflect-ai-inside-your-interview-br.vercel.app";
+
+const DESCRIPTION =
+  "An adaptive AI mock interview built from your own resume: HR warm-up, technical questions drawn from your projects, and a stress round if your scores dip. Every answer scored, with specific feedback.";
+
 export const metadata: Metadata = {
+  // metadataBase is what lets Next resolve the generated opengraph-image to an
+  // absolute URL. Without it the card silently ships a relative path, which
+  // every scraper ignores -- so the link previews as a bare URL.
+  metadataBase: new URL(SITE_URL),
   title: "ReflectInterview — Practice the interview before it counts",
-  description:
-    "AI mock interviews with adaptive difficulty, voice input, and behavioural feedback.",
+  description: DESCRIPTION,
+  openGraph: {
+    type: "website",
+    siteName: "ReflectInterview",
+    url: SITE_URL,
+    title: "ReflectInterview — Practice the interview before it counts",
+    description: DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ReflectInterview — Practice the interview before it counts",
+    description: DESCRIPTION,
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

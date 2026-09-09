@@ -65,6 +65,47 @@ const LANGUAGE_PRESETS = [
 
 type Phase = "setup" | "interview" | "report";
 
+type FetchOpts = {
+  count: number;
+  round: string;
+  difficulty: string;
+  scoreHist: number[];
+  stressC: number;
+  used: string[];
+  cleanedOverride?: CleanedResume;
+  sessionOverride?: string;
+  roleOverride?: string | null;
+  langOverride?: string | null;
+};
+
+// An interview is a long, expensive thing to build: ten model round-trips
+// and however long the person spent writing each answer. Losing it to an
+// accidental refresh, a phone backgrounding the tab, or a mis-hit browser
+// back is the worst thing this app can do to someone, so the in-progress
+// session is mirrored to localStorage.
+//
+// The resume FILE is deliberately not stored -- a File can't be serialised
+// and isn't needed once the backend has parsed it. `cleaned` (the parsed
+// skills/projects/experience) is what every later request actually uses.
+const SESSION_KEY = "reflectinterview_session_v1";
+
+type PersistedSession = {
+  sessionId: string;
+  cleaned: CleanedResume;
+  count: number;
+  round: string;
+  difficulty: string;
+  scoreHistory: number[];
+  stressCount: number;
+  usedSkills: string[];
+  currentQuestion: string | null;
+  storedCount: number;
+  role: string;
+  language: string;
+  interviewComplete: boolean;
+  completionNotice: string;
+};
+
 function speakText(text: string) {
   if (!("speechSynthesis" in window)) {
     alert("Speech synthesis isn't supported in this browser.");
@@ -142,6 +183,11 @@ function InterviewSessionInner() {
   const [reportError, setReportError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
+  // The exact arguments of the last question fetch, so a failed one can be
+  // retried as itself rather than forcing the user to start over.
+  const lastFetchOptsRef = useRef<FetchOpts | null>(null);
+  const restoredRef = useRef(false);
+
   const nextStartSignal = useAbortSignal();
   const nextQuestionSignal = useAbortSignal();
   const nextEvalSignal = useAbortSignal();
@@ -204,18 +250,114 @@ function InterviewSessionInner() {
   const roleValueRef = useRef<string | null>(null);
   const langValueRef = useRef<string | null>(null);
 
-  async function fetchNextQuestion(opts: {
-    count: number;
-    round: string;
-    difficulty: string;
-    scoreHist: number[];
-    stressC: number;
-    used: string[];
-    cleanedOverride?: CleanedResume;
-    sessionOverride?: string;
-    roleOverride?: string | null;
-    langOverride?: string | null;
-  }) {
+  // Restore an interrupted interview once, on mount. State updates happen
+  // inside a callback rather than the effect body, which is what
+  // react-hooks/set-state-in-effect wants and matches auth-context.
+  useEffect(() => {
+    let cancelled = false;
+    // A microtask, NOT requestAnimationFrame. rAF is throttled to zero
+    // whenever the tab is not painting, so a session restored into a
+    // background or unfocused tab would silently never happen -- exactly the
+    // failure that made the old score count-up display a wrong number. The
+    // deferral only exists to satisfy react-hooks/set-state-in-effect, and a
+    // microtask satisfies it just as well while always running. Same pattern
+    // as history/page.tsx.
+    Promise.resolve().then(() => {
+      // The guard is claimed here rather than in the effect body: StrictMode
+      // mounts, unmounts and remounts in development, and a guard set on the
+      // way in would block the second mount from ever restoring.
+      if (cancelled || restoredRef.current) return;
+      restoredRef.current = true;
+
+      let raw: string | null = null;
+      try {
+        raw = localStorage.getItem(SESSION_KEY);
+      } catch {
+        return; // private mode / blocked storage -- nothing to restore
+      }
+      if (!raw) return;
+      try {
+        const saved: PersistedSession = JSON.parse(raw);
+        if (!saved.sessionId || !saved.cleaned) return;
+        setSessionId(saved.sessionId);
+        setCleaned(saved.cleaned);
+        setCount(saved.count);
+        setRound(saved.round);
+        setDifficulty(saved.difficulty);
+        setScoreHistory(saved.scoreHistory ?? []);
+        setStressCount(saved.stressCount ?? 0);
+        setUsedSkills(saved.usedSkills ?? []);
+        setCurrentQuestion(saved.currentQuestion);
+        setStoredCount(saved.storedCount ?? 0);
+        setRole(saved.role ?? "None");
+        setLanguage(saved.language ?? "English");
+        setInterviewComplete(saved.interviewComplete ?? false);
+        setCompletionNotice(saved.completionNotice ?? "");
+        roleValueRef.current = saved.role && saved.role !== "None" ? saved.role : null;
+        langValueRef.current =
+          saved.language && saved.language !== "English" ? saved.language : null;
+        setQuestionStartedAt(Date.now());
+        setPhase("interview");
+      } catch {
+        try {
+          localStorage.removeItem(SESSION_KEY);
+        } catch {
+          /* nothing useful to do if storage is unavailable */
+        }
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Mirror the live interview to storage. Only writes during the interview
+  // phase -- the setup screen has nothing worth restoring, and the report
+  // is regenerated from the server-side session anyway.
+  useEffect(() => {
+    if (phase !== "interview" || !sessionId || !cleaned) return;
+    const snapshot: PersistedSession = {
+      sessionId,
+      cleaned,
+      count,
+      round,
+      difficulty,
+      scoreHistory,
+      stressCount,
+      usedSkills,
+      currentQuestion,
+      storedCount,
+      role,
+      language,
+      interviewComplete,
+      completionNotice,
+    };
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(snapshot));
+    } catch {
+      /* quota or blocked storage -- persistence is a nicety, never a blocker */
+    }
+  }, [
+    phase, sessionId, cleaned, count, round, difficulty, scoreHistory, stressCount,
+    usedSkills, currentQuestion, storedCount, role, language, interviewComplete,
+    completionNotice,
+  ]);
+
+  function clearSavedSession() {
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch {
+      /* see above */
+    }
+  }
+
+  function retryLastQuestion() {
+    const opts = lastFetchOptsRef.current;
+    if (opts) fetchNextQuestion(opts);
+  }
+
+  async function fetchNextQuestion(opts: FetchOpts) {
+    lastFetchOptsRef.current = opts;
     const activeCleaned = opts.cleanedOverride || cleaned;
     const activeSession = opts.sessionOverride || sessionId;
     if (opts.roleOverride !== undefined) roleValueRef.current = opts.roleOverride;
@@ -454,6 +596,7 @@ function InterviewSessionInner() {
   }
 
   function handleResetInterview() {
+    clearSavedSession();
     setPhase("setup");
     setSessionId(null);
     setCleaned(null);
@@ -520,10 +663,21 @@ function InterviewSessionInner() {
                 {storedCount} answer{storedCount !== 1 ? "s" : ""} saved to this session
               </p>
             </div>
-            <SecondaryButton onClick={handleResetInterview}>
-              <RotateCcw size={15} strokeWidth={1.75} aria-hidden />
-              Reset
-            </SecondaryButton>
+            <div className="flex shrink-0 gap-2">
+              {/* Answers are already scored and stored server-side by this
+                  point, so refusing to hand over the report until all ten
+                  questions are done was withholding something already paid
+                  for. Reset was the only other exit, and it destroys them. */}
+              {storedCount > 0 && !interviewComplete && (
+                <SecondaryButton onClick={handleGenerateReport} disabled={reportLoading}>
+                  {reportLoading ? "Generating…" : "Finish early"}
+                </SecondaryButton>
+              )}
+              <SecondaryButton onClick={handleResetInterview}>
+                <RotateCcw size={15} strokeWidth={1.75} aria-hidden />
+                Reset
+              </SecondaryButton>
+            </div>
           </div>
           {/* Turns "how much longer is this?" from a guess into a glance --
               and the bar takes the round's colour, so the escalation into
@@ -555,7 +709,22 @@ function InterviewSessionInner() {
               )}
           </Card>
         ) : interviewError ? (
-          <Alert kind="error">{interviewError}</Alert>
+          /* A dead end here used to cost the whole interview: the only way
+             out of a failed question was Reset, which discards every answer
+             already given. Retrying re-runs the same request. */
+          <Card>
+            <Alert kind="error">{interviewError}</Alert>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <PrimaryButton onClick={retryLastQuestion} disabled={nextLoading}>
+                {nextLoading ? "Retrying…" : "Try again"}
+              </PrimaryButton>
+              {storedCount > 0 && (
+                <SecondaryButton onClick={handleGenerateReport} disabled={reportLoading}>
+                  {reportLoading ? "Generating…" : `Finish with ${storedCount} answered`}
+                </SecondaryButton>
+              )}
+            </div>
+          </Card>
         ) : nextLoading && !currentQuestion ? (
           <Card>
               <Spinner label="Generating question… the first one takes longest while the model warms up." />
@@ -589,6 +758,17 @@ function InterviewSessionInner() {
                   onChange={setAnswer}
                   placeholder="Type your answer, or record it below…"
                   rows={5}
+                  onSubmit={() => {
+                    if (!evaluated && !evalLoading && answer.trim()) handleEvaluate();
+                  }}
+                  hint={
+                    <>
+                      Press <kbd className="rounded border border-ri-border bg-ri-surface-alt px-1 font-sans">Ctrl</kbd>
+                      {" + "}
+                      <kbd className="rounded border border-ri-border bg-ri-surface-alt px-1 font-sans">Enter</kbd>
+                      {" to submit."}
+                    </>
+                  }
                 />
 
                 <div className="flex flex-wrap items-center gap-2">
