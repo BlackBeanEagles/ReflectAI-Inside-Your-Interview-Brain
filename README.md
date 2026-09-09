@@ -1,6 +1,7 @@
 # ReflectInterview (ReflectAI — Inside Your Interview Brain)
 
-**Live app:** [reflectinterview.streamlit.app](https://reflectinterview.streamlit.app) · **API:** [reflectinterview-api.onrender.com](https://reflectinterview-api.onrender.com/health)
+**Live app:** [reflect-ai-inside-your-interview-br.vercel.app](https://reflect-ai-inside-your-interview-br.vercel.app) · **API:** [reflectinterview-api.onrender.com](https://reflectinterview-api.onrender.com/health)
+**Older Streamlit build** (still deployed, no longer developed): [reflectinterview.streamlit.app](https://reflectinterview.streamlit.app)
 **Repository:** [github.com/BlackBeanEagles/ReflectAI-Inside-Your-Interview-Brain](https://github.com/BlackBeanEagles/ReflectAI-Inside-Your-Interview-Brain)
 
 > Free-tier hosting note: the backend spins down after ~15 minutes idle and the frontend sleeps similarly — the first request after a quiet period can take 30–50 seconds to wake up. That's the hosting tier, not a bug.
@@ -28,7 +29,8 @@ An AI-powered mock interview platform that runs full multi-round interviews (HR 
 ```mermaid
 flowchart TB
   subgraph client [Client]
-    FE[Streamlit frontend]
+    FE["Next.js frontend (web/) — current"]
+    FE2["Streamlit (frontend/) — legacy"]
   end
   subgraph server [FastAPI backend]
     API[Routes: interview / resume / evaluation / session / auth]
@@ -94,14 +96,18 @@ See `.env.example` for every configurable variable (rate limits, upload caps, se
 ### 3. Run the backend and frontend
 
 ```bash
-uvicorn app.main:app --reload      # backend — http://127.0.0.1:8000
-streamlit run frontend/app.py      # frontend — http://localhost:8501
+uvicorn app.main:app --reload      # backend  — http://127.0.0.1:8000
+cd web && npm install && npm run dev   # frontend — http://localhost:3000
 ```
 
-The frontend above is the original Streamlit app. `web/` (Next.js) is the
-current, feature-complete frontend — see `web/README.md` for its own
-`npm install && npm run dev` setup (http://localhost:3000). Deploying?
-`DEPLOY.md` covers `web/`.
+`web/` (Next.js) is the current frontend and the one that is deployed; see
+[`web/README.md`](web/README.md) for its own setup and `DEPLOY.md` for
+hosting it.
+
+The original Streamlit app is still in `frontend/app.py` and still runs
+(`streamlit run frontend/app.py`, http://localhost:8501), but it is no
+longer being developed — none of the interface work since August has been
+applied to it, so the two look nothing alike.
 
 Confirm the backend is healthy: `GET http://127.0.0.1:8000/health`.
 
@@ -118,7 +124,7 @@ pytest
 
 ## Deploying your own copy for free
 
-See **[DEPLOY.md](DEPLOY.md)** for the full walkthrough: Render (backend, Docker) + Streamlit Community Cloud (frontend) + Groq (LLM/Whisper), all on free tiers, plus the optional Neon Postgres setup for persistence/accounts. See **[PRIVACY.md](PRIVACY.md)** for exactly what gets stored when persistence is enabled, and what you're responsible for before pointing real users at it.
+See **[DEPLOY.md](DEPLOY.md)** for the full walkthrough: Render (backend, Docker) + Vercel (the `web/` frontend) + Groq (LLM/Whisper), all on free tiers, plus the optional Neon Postgres setup for persistence/accounts. See **[PRIVACY.md](PRIVACY.md)** for exactly what gets stored when persistence is enabled, and what you're responsible for before pointing real users at it.
 
 ---
 
@@ -160,7 +166,8 @@ CORS is configured via `ALLOWED_ORIGINS` / `ALLOWED_ORIGIN_REGEX` in `.env.examp
 | `services/` | Orchestration (`interview_service`), flow control (`decision_engine`, `adaptive_engine`), résumé pipeline (`resume_processor`, `pdf_parser`, `resume_parser`, `data_cleaner`), evaluation (`evaluator`, `evaluation_logic`), reporting (`report_generator`, `replay_learning`, `cognitive_pipeline`), **`ats_scorer`** (deterministic scoring), **`db`** (optional Postgres persistence), **`auth`** (bcrypt + JWT), **`speech`** (Whisper transcription), `session_manager` (in-memory sessions) |
 | `models/schemas.py` | All Pydantic request/response contracts |
 | `utils/llm.py` | Ollama/Groq HTTP client, generation profiles, warm-up |
-| `frontend/app.py` | Streamlit UI — Interview / Resume Analysis / ATS Score tabs, sidebar auth + status |
+| `web/` | **Next.js frontend (current).** App Router, TypeScript, Tailwind. One route per feature; `lib/api.ts` is one typed function per backend endpoint |
+| `frontend/app.py` | Streamlit UI — the original frontend, still runnable, no longer developed |
 | `tests/` | Pytest suite |
 | `DEPLOY.md` / `PRIVACY.md` | Free-tier deployment guide and data-handling documentation |
 
@@ -173,6 +180,9 @@ CORS is configured via `ALLOWED_ORIGINS` / `ALLOWED_ORIGIN_REGEX` in `.env.examp
 - **Grammar & Readability (ATS scorer)** uses heuristic proxies (bullet consistency, verb-tense consistency, repeated-word detection) rather than a real grammar-checking library — which is exactly why it's the lowest-weighted category (3%).
 - **Synonym table (ATS scorer)** is a curated common-alias list, not a licensed skills taxonomy — it won't catch every equivalent term.
 - **No CI pipeline yet** — tests run locally/manually, not automatically on push.
+- **Password reset email only reaches the Resend account owner.** Without a verified sending domain, Resend's sandbox sender (`onboarding@resend.dev`) delivers only to the address that owns the Resend account. `/auth/forgot-password` still returns its generic success message either way — by design, so it can't be used to enumerate registered emails — so a failed send is only visible in the server logs. Verifying a domain in Resend and setting `RESEND_FROM_EMAIL` fixes it.
+- **No account deletion.** There is no endpoint or UI to delete an account and its stored data; removal is a manual database operation. This also blocks a Google Play listing, which requires an in-app deletion path plus a public web URL for it.
+- **Two frontends, one maintained.** `frontend/app.py` (Streamlit) and `web/` (Next.js) both talk to the same API. Only `web/` is being developed. Nothing keeps them in sync, so the Streamlit app will drift further behind.
 
 ---
 
