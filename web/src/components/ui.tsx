@@ -20,6 +20,20 @@ export function scoreColor(score: number | null | undefined): string {
   return "var(--ri-stress)";
 }
 
+/** The three rounds warm as the interview escalates, so you can tell where
+ *  you are without reading the label. */
+export const ROUND_ACCENT: Record<string, string> = {
+  hr: "var(--ri-hr)",
+  technical: "var(--ri-tech)",
+  stress: "var(--ri-stress)",
+};
+
+const ROUND_LABEL: Record<string, string> = {
+  hr: "HR round",
+  technical: "Technical round",
+  stress: "Stress round",
+};
+
 /** A score out of 10: the exact value in the middle, with a ring that sweeps
  *  to it on arrival. The ring is what makes a 6.2 and an 8.9 separable at a
  *  glance across a row of panels, which a row of bare numerals is not. */
@@ -27,10 +41,18 @@ export function ScorePanel({
   label,
   score,
   size = "md",
+  round,
 }: {
   label: string;
   score: number | null | undefined;
   size?: "sm" | "md";
+  /** Marks the panel as belonging to a round, shown as a small dot beside
+   *  the label. The RING deliberately stays score-coloured: on the report
+   *  the four dials are Overall/HR/Technical/Stress, and recolouring them by
+   *  round would trade away the good/fair/poor signal -- which is the thing
+   *  a score dial exists to convey -- for identity the label already gives.
+   *  The dot adds the round without spending the ring on it. */
+  round?: string;
 }) {
   const color = scoreColor(score);
 
@@ -76,24 +98,19 @@ export function ScorePanel({
           {score != null ? score.toFixed(1) : "–"}
         </div>
       </div>
-      <div className="ri-eyebrow mt-2 truncate">{label}</div>
+      <div className="ri-eyebrow mt-2 flex items-center justify-center gap-1.5 truncate">
+        {round && ROUND_ACCENT[round] && (
+          <span
+            aria-hidden
+            className="h-1.5 w-1.5 shrink-0 rounded-full"
+            style={{ background: ROUND_ACCENT[round] }}
+          />
+        )}
+        {label}
+      </div>
     </div>
   );
 }
-
-/** The three rounds warm as the interview escalates, so you can tell where
- *  you are without reading the label. */
-export const ROUND_ACCENT: Record<string, string> = {
-  hr: "var(--ri-hr)",
-  technical: "var(--ri-tech)",
-  stress: "var(--ri-stress)",
-};
-
-const ROUND_LABEL: Record<string, string> = {
-  hr: "HR round",
-  technical: "Technical round",
-  stress: "Stress round",
-};
 
 export function RoundBadge({ round }: { round: string }) {
   const accent = ROUND_ACCENT[round] || ROUND_ACCENT.hr;

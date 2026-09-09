@@ -876,9 +876,37 @@ function InterviewSessionInner() {
                   {evalLoading ? "Evaluating…" : "Evaluate answer"}
                 </PrimaryButton>
                 <SecondaryButton onClick={handleSkip} disabled={nextLoading} className="w-full sm:w-auto">
-                  Skip
+                  {nextLoading && !evalLoading ? "Skipping…" : "Skip"}
                 </SecondaryButton>
               </div>
+
+              {/* Skipping used to grey the button out for several seconds with
+                  no other change on screen -- the question stayed put, so
+                  nothing said a request was in flight. The Thinking card only
+                  covers the case where there is no question yet. */}
+              {nextLoading && currentQuestion && (
+                <div className="mt-3">
+                  <Thinking label="Writing the next question…" />
+                </div>
+              )}
+
+              {/* Skipping is free, but it is not neutral: a skipped question
+                  produces no score, and the engine decides difficulty and
+                  whether to run a stress round from score history alone.
+                  Skip everything and the interview cannot adapt to you --
+                  worth saying once, where the decision is being made. */}
+              {!evaluated && !nextLoading && (
+                <p className="mt-2 text-xs text-ri-text-mute">
+                  Skipped questions aren&apos;t scored, so they don&apos;t shape the
+                  difficulty of what comes next.
+                </p>
+              )}
+
+              {evalLoading && (
+                <div className="mt-3">
+                  <Thinking label="Reading your answer…" />
+                </div>
+              )}
 
               {evalError && <div className="mt-3"><Alert kind="error">{evalError}</Alert></div>}
 

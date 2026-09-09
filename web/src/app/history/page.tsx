@@ -42,14 +42,46 @@ export default function HistoryPage() {
   }, [token]);
 
   if (!user) {
+    // An empty state should say why it is empty and offer one action. This
+    // was a single notice floating over several hundred pixels of nothing,
+    // which tells a first-time visitor neither what History is for nor what
+    // it will look like once it works.
     return (
-      <div className="space-y-4">
-        <h1 className="ri-display text-3xl">Interview History Dashboard</h1>
-        <Alert kind="info">
-          <Link href="/login" className="underline font-semibold">Log in</Link> to see score trends
-          across your past sessions. Anonymous use still works everywhere else — an account just
-          lets your history follow you across visits.
-        </Alert>
+      <div className="ri-enter mx-auto max-w-2xl space-y-6">
+        <div>
+          <h1 className="ri-display text-3xl">History</h1>
+          <p className="ri-prose mt-2 text-ri-text-mute">
+            Every saved session in one place: score trends across rounds, the questions you were
+            asked, and how each answer was judged.
+          </p>
+        </div>
+
+        <Card>
+          <p className="ri-eyebrow">What appears here</p>
+          <ul className="mt-3 space-y-2 text-sm text-ri-text-mute">
+            <li>A trend line of overall, HR, technical and stress scores, session by session.</li>
+            <li>Per-session reports you can reopen, with the full question-by-question breakdown.</li>
+            <li>Each new report compared against your own earlier ones — never against other people.</li>
+          </ul>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link
+              href="/"
+              className="ri-focus inline-flex min-h-10 items-center justify-center rounded-ri-control bg-ri-accent px-4 text-sm font-medium text-white transition-colors hover:bg-[var(--ri-accent-hover)]"
+            >
+              Start your first interview
+            </Link>
+            <Link
+              href="/login"
+              className="ri-focus inline-flex min-h-10 items-center justify-center rounded-ri-control border border-ri-border px-4 text-sm font-medium transition-colors hover:border-ri-border-strong hover:bg-ri-surface-alt"
+            >
+              Log in
+            </Link>
+          </div>
+          <p className="mt-4 text-xs text-ri-text-mute">
+            History needs an account, and a session only appears if you ticked the save option when
+            starting it. Everything else in the app works without logging in.
+          </p>
+        </Card>
       </div>
     );
   }

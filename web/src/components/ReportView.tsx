@@ -10,10 +10,30 @@ const COMPARISON_LABELS: Record<string, string> = {
   stress_score: "Stress",
 };
 
+/** The backend returns strengths and strength_patterns (and the weakness
+ *  equivalents) as separate lists, and in practice they overlap heavily --
+ *  from a single evaluated answer the report rendered the same observation
+ *  in three different coloured boxes. Merging them, case- and
+ *  punctuation-insensitively, means each observation is stated once. */
+function mergeUnique(...lists: string[][]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of lists.flat()) {
+    const key = item.trim().toLowerCase().replace(/[.,;:!?]+$/, "");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(item.trim());
+  }
+  return out;
+}
+
 export default function ReportView({ report }: { report: ReportResponse }) {
   const cog = report.cognitive;
   const comparison = report.comparison;
   const voice = report.voice_insights;
+
+  const allStrengths = mergeUnique(report.strengths, report.strength_patterns);
+  const allWeaknesses = mergeUnique(report.weaknesses, report.weakness_patterns);
 
   return (
     <div className="space-y-6">
@@ -24,9 +44,9 @@ export default function ReportView({ report }: { report: ReportResponse }) {
         </h3>
         <div className="flex gap-3 flex-wrap">
           <ScorePanel label="Overall" score={report.overall_score} />
-          <ScorePanel label="HR Round" score={report.hr_score} />
-          <ScorePanel label="Technical" score={report.technical_score} />
-          <ScorePanel label="Stress" score={report.stress_score} />
+          <ScorePanel label="HR Round" score={report.hr_score} round="hr" />
+          <ScorePanel label="Technical" score={report.technical_score} round="technical" />
+          <ScorePanel label="Stress" score={report.stress_score} round="stress" />
         </div>
         <p className="text-xs text-ri-text-mute mt-2">
           Based on {report.total_questions} evaluated answer{report.total_questions !== 1 ? "s" : ""}
@@ -126,22 +146,9 @@ export default function ReportView({ report }: { report: ReportResponse }) {
               {report.behavior_summary}
             </div>
           )}
-          {report.strength_patterns.length > 0 && (
-            <div className="mt-3">
-              <p className="text-sm font-semibold mb-1">Strength patterns</p>
-              <ul className="space-y-1">
-                {report.strength_patterns.map((s, i) => <ListItem key={i} kind="strength">{s}</ListItem>)}
-              </ul>
-            </div>
-          )}
-          {report.weakness_patterns.length > 0 && (
-            <div className="mt-3">
-              <p className="text-sm font-semibold mb-1">Weakness patterns</p>
-              <ul className="space-y-1">
-                {report.weakness_patterns.map((w, i) => <ListItem key={i} kind="weakness">{w}</ListItem>)}
-              </ul>
-            </div>
-          )}
+          {/* strength_patterns / weakness_patterns are merged into the
+              Strengths and Weaknesses sections below rather than repeated
+              here -- they overlap almost entirely in practice. */}
         </section>
       )}
 
@@ -174,11 +181,11 @@ export default function ReportView({ report }: { report: ReportResponse }) {
       )}
 
       {/* ── Strengths / weaknesses / patterns / recommendations ── */}
-      {report.strengths.length > 0 && (
-        <ListSection title="Strengths" items={report.strengths} kind="strength" />
+      {allStrengths.length > 0 && (
+        <ListSection title="Strengths" items={allStrengths} kind="strength" />
       )}
-      {report.weaknesses.length > 0 && (
-        <ListSection title="Weaknesses" items={report.weaknesses} kind="weakness" />
+      {allWeaknesses.length > 0 && (
+        <ListSection title="Weaknesses" items={allWeaknesses} kind="weakness" />
       )}
       {report.patterns.length > 0 && (
         <ListSection title="Patterns Detected" items={report.patterns} kind="pattern" />
