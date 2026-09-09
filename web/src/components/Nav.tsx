@@ -82,9 +82,15 @@ export default function Nav() {
           <div className="flex shrink-0 items-center gap-2 text-sm">
             {user ? (
               <>
-                <span className="hidden max-w-[150px] truncate text-ri-text-mute sm:inline">
+                {/* The account page is where deletion lives, so it has to be
+                    reachable in a click -- Play requires an in-app path to it,
+                    and burying it would fail that as surely as not having it. */}
+                <Link
+                  href="/account"
+                  className="ri-focus hidden max-w-[150px] truncate rounded-md px-2.5 py-1.5 text-ri-text-mute transition-colors hover:text-ri-text sm:inline-block"
+                >
                   {user.name || user.email}
-                </span>
+                </Link>
                 <button
                   onClick={logout}
                   className="ri-focus rounded-md px-2.5 py-1.5 text-ri-text-mute transition-colors hover:text-ri-text"

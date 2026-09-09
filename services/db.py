@@ -414,6 +414,43 @@ def mark_password_reset_used(reset_id: int) -> None:
         )
 
 
+def delete_user_account(user_id: int) -> Dict[str, int]:
+    """
+    Permanently delete a user and everything stored about them. Returns a
+    per-table count of deleted rows so the caller can log what actually went.
+
+    The child tables are deleted EXPLICITLY rather than by relying on the
+    foreign keys. resumes, interactions and reports are all declared
+    ON DELETE SET NULL, so deleting the user would detach those rows and
+    leave the résumé text, the answers and the reports in the database
+    forever with a null owner. That is the opposite of what a deletion
+    request means -- it would quietly turn "delete my account" into
+    "anonymise the join column". password_resets is ON DELETE CASCADE and
+    would go on its own, but it is listed here anyway so everything this
+    removes is readable in one place instead of inferred from the DDL.
+
+    Children are deleted before the parent so this works regardless of the
+    constraints. It all runs inside one connection block, which commits as a
+    single transaction on success: a partial delete would leave an account
+    that cannot be logged into but whose data is still stored, which is the
+    worst of both outcomes.
+    """
+    pool = _get_pool()
+    if pool is None:
+        raise RuntimeError("Persistent storage is not configured on this server.")
+
+    counts: Dict[str, int] = {}
+    with pool.connection() as conn:
+        for table in ("interactions", "resumes", "reports", "password_resets"):
+            cur = conn.execute(f"DELETE FROM {table} WHERE user_id = %s", (user_id,))
+            counts[table] = max(cur.rowcount, 0)
+        cur = conn.execute("DELETE FROM users WHERE id = %s", (user_id,))
+        counts["users"] = max(cur.rowcount, 0)
+
+    logger.info("db: deleted account %s -> %s", user_id, counts)
+    return counts
+
+
 def update_user_password(user_id: int, password_hash: str) -> None:
     """Overwrite a user's stored password hash (used by the reset flow)."""
     pool = _get_pool()

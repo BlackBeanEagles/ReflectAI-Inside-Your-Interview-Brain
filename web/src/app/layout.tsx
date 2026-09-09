@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { ResumeProvider } from "@/lib/resume-context";
 import Nav from "@/components/Nav";
+import ServiceWorker from "@/components/ServiceWorker";
 
 // No `weight` array on purpose: that loads static instances, and the type
 // scale here uses intermediate weights (640, 680) that would otherwise snap
@@ -33,6 +34,20 @@ export const metadata: Metadata = {
     title: "ReflectInterview — Practice the interview before it counts",
     description: DESCRIPTION,
   },
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "ReflectInterview",
+    // "default" keeps the iOS status bar legible against the light ground;
+    // "black-translucent" would put dark text on the paper background.
+    statusBarStyle: "default",
+  },
   twitter: {
     card: "summary_large_image",
     title: "ReflectInterview — Practice the interview before it counts",
@@ -40,10 +55,19 @@ export const metadata: Metadata = {
   },
 };
 
+// themeColor lives on `viewport`, not `metadata` -- Next warns and drops it
+// if it is put on the latter. This is what paints the Android status bar and
+// the browser chrome once the app is installed.
+export const viewport: Viewport = {
+  themeColor: "#faf9f6",
+  colorScheme: "light",
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
+        <ServiceWorker />
         <AuthProvider>
           <ResumeProvider>
             <Nav />

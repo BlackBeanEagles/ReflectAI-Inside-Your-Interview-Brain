@@ -19,7 +19,7 @@ Schemas:
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 
@@ -573,3 +573,17 @@ class ReplayCompareResponse(BaseModel):
     changes_detected: List[str] = []
     learning_insight: str = ""
     error: bool = False
+
+
+class DeleteAccountRequest(BaseModel):
+    """Account deletion is irreversible, so the password is required again even
+    though the request already carries a valid token."""
+    password: str = Field(..., min_length=1, description="Current account password.")
+
+
+class DeleteAccountResponse(BaseModel):
+    message: str
+    deleted: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Rows removed per table, so the caller can show what was deleted.",
+    )

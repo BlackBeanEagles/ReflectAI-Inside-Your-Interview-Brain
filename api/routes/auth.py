@@ -10,6 +10,7 @@ Endpoints:
     GET  /auth/history           — Past final reports for the current user
     POST /auth/forgot-password   — Request a password reset email
     POST /auth/reset-password    — Consume a reset token, set a new password
+    DELETE /auth/account         — Permanently delete the account and its data
 
 Accounts require persistent storage (DATABASE_URL) — there's no meaningful
 way to have a durable account backed only by in-memory state. If the
@@ -30,6 +31,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Header, HTTPException
 
 from models.schemas import (
+    DeleteAccountRequest,
+    DeleteAccountResponse,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     LoginRequest,
@@ -136,6 +139,51 @@ def me(current=Depends(get_current_user)):
 def history(current=Depends(get_current_user)):
     reports = db.get_user_reports(current["user_id"])
     return UserHistoryResponse(reports=[UserReportItem(**r) for r in reports])
+
+
+@router.delete("/account", response_model=DeleteAccountResponse)
+def delete_account(request: DeleteAccountRequest, current=Depends(get_current_user)):
+    """
+    Permanently delete the logged-in user's account and everything stored
+    about them: résumés, interview answers, generated reports, and any
+    outstanding password-reset tokens.
+
+    Requires the password again even though the caller already holds a valid
+    token. A JWT here can be a stale tab, a shared machine or a borrowed
+    phone, and this action is irreversible with no undo and no backup to
+    restore from -- re-authentication is the only thing between a mis-click
+    and permanent data loss.
+
+    Google Play requires apps that let users create accounts to offer
+    in-app deletion plus a publicly reachable page describing it; the
+    frontend's /account and /delete-account pages are that.
+    """
+    _require_db()
+
+    user = db.get_user_by_id(current["user_id"])
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    full = db.get_user_by_email(user["email"])
+    if full is None or not auth.verify_password(request.password, full["password_hash"]):
+        # Same wording as a failed login on purpose: this endpoint must not
+        # become a way to test a password against a different error surface.
+        raise HTTPException(status_code=401, detail="Incorrect password.")
+
+    try:
+        counts = db.delete_user_account(current["user_id"])
+    except Exception:
+        logger.exception("auth: account deletion failed for user %s", current["user_id"])
+        raise HTTPException(
+            status_code=500,
+            detail="Could not delete the account. Nothing was removed — please try again.",
+        )
+
+    logger.info("auth: account deleted for %s", auth.mask_email(user["email"]))
+    return DeleteAccountResponse(
+        message="Your account and all stored data have been permanently deleted.",
+        deleted=counts,
+    )
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)

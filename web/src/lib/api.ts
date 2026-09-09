@@ -86,6 +86,16 @@ export function getMe(token: string): Promise<User> {
   return request<User>("/auth/me", {}, token);
 }
 
+/** Permanently deletes the account and everything stored about it. The
+ *  password is re-checked server-side even though we send a token, because
+ *  this is irreversible -- see the endpoint's docstring. */
+export function deleteAccount(
+  password: string,
+  token: string,
+): Promise<{ message: string; deleted: Record<string, number> }> {
+  return request("/auth/account", { method: "DELETE", body: JSON.stringify({ password }) }, token);
+}
+
 export function getAuthHistory(token: string): Promise<UserHistoryResponse> {
   return request<UserHistoryResponse>("/auth/history", {}, token);
 }
