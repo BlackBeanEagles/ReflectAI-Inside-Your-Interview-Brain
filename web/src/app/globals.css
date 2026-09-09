@@ -43,6 +43,15 @@
   --ri-text-mute: #6a645a;
   --ri-track: #eae6dc;
 
+  /* Page texture. A dot grid and one soft wash behind the top of the
+     document -- the two ways to give a ground depth without inventing
+     something for the eye to look at. Both are near-threshold on purpose:
+     you should notice the page has a surface, not notice a pattern. */
+  --ri-grid: rgba(28, 26, 23, 0.07);
+  --ri-grid-size: 22px;
+  --ri-wash: color-mix(in srgb, var(--ri-accent) 16%, transparent);
+  --ri-wash-2: color-mix(in srgb, var(--ri-tech) 11%, transparent);
+
   /* Warm-tinted shadows. A neutral-black shadow over a warm ground reads
      as a grey smudge; tinting it to the ground keeps it looking like
      shade rather than dirt. */
@@ -115,6 +124,11 @@
   --ri-text: #e8eaf0;
   --ri-text-mute: #98a0ae;
   --ri-track: #272c35;
+
+  --ri-grid: rgba(255, 255, 255, 0.045);
+  --ri-grid-size: 22px;
+  --ri-wash: color-mix(in srgb, var(--ri-accent) 12%, transparent);
+  --ri-wash-2: color-mix(in srgb, var(--ri-tech) 8%, transparent);
 
   --ri-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
   --ri-shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.45), 0 10px 24px rgba(0, 0, 0, 0.4);
@@ -192,7 +206,23 @@
 }
 
 body {
-  background: var(--background);
+  /* Three layers, painted in one declaration so there is no extra DOM and
+     nothing to keep in sync:
+       1. two soft washes anchored above the fold -- sized in px, not
+          percentages, so they stay put instead of stretching to the height
+          of whatever page they land on;
+       2. a dot grid, which is what actually reads as "surface";
+       3. the flat ground underneath.
+     All of it scrolls with the document rather than being fixed, so it
+     behaves like paper rather than a backdrop the content slides over. */
+  background-color: var(--ri-page-bg);
+  background-image:
+    radial-gradient(900px 420px at 12% -8%, var(--ri-wash), transparent 72%),
+    radial-gradient(720px 360px at 88% -4%, var(--ri-wash-2), transparent 70%),
+    radial-gradient(circle at 1px 1px, var(--ri-grid) 1px, transparent 0);
+  background-size: 100% 900px, 100% 900px, var(--ri-grid-size) var(--ri-grid-size);
+  background-repeat: no-repeat, no-repeat, repeat;
+  background-attachment: scroll;
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;

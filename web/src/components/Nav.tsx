@@ -46,8 +46,11 @@ export default function Nav() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
+  // Translucent rather than opaque: the page texture and wash stay visible
+  // through the bar, so it reads as part of the same sheet instead of a white
+  // strip laid on top of it.
   return (
-    <header className="sticky top-0 z-20 border-b border-ri-border bg-ri-surface">
+    <header className="sticky top-0 z-20 border-b border-ri-border bg-[color-mix(in_srgb,var(--ri-surface)_82%,transparent)] backdrop-blur-md">
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         <div className="flex h-14 items-center justify-between gap-4">
           <Link href="/" className="ri-focus flex min-w-0 items-center gap-2 md:shrink-0">
