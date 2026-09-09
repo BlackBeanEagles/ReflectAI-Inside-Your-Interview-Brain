@@ -46,7 +46,7 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center">
-      <div className="max-w-sm w-full ri-fade-in">
+      <div className="max-w-sm w-full ri-enter">
         <Card>
           <h1 className="text-xl font-bold mb-1">Sign up</h1>
           <p className="text-sm text-ri-text-mute mb-5">

@@ -111,29 +111,27 @@ export function RoundBadge({ round }: { round: string }) {
 export function Card({
   children,
   className = "",
+  flush = false,
 }: {
   children: React.ReactNode;
   className?: string;
+  /** Drop the padding, for a card holding a full-bleed table, image or
+   *  clickable header that should reach the card's edges. */
+  flush?: boolean;
 }) {
+  // Padded by default. A previous version made callers wrap content in a
+  // separate <CardBody>, which meant every card that forgot to became a
+  // borderless-looking box with text jammed against its edge -- and eight
+  // pages did exactly that. Defaults should be what most callers want.
   return (
     <div
-      className={`rounded-xl border border-ri-border bg-ri-surface shadow-[var(--ri-shadow)] ${className}`}
+      className={`rounded-xl border border-ri-border bg-ri-surface shadow-[var(--ri-shadow)] ${
+        flush ? "" : "p-5"
+      } ${className}`}
     >
       {children}
     </div>
   );
-}
-
-/** Cards default to no padding so a card can hold a flush table or a
- *  full-bleed header; most callers want this instead. */
-export function CardBody({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return <div className={`p-5 ${className}`}>{children}</div>;
 }
 
 // active:scale is the cheapest honest affordance there is: a control that

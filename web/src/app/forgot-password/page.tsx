@@ -34,7 +34,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center">
-      <div className="max-w-sm w-full ri-fade-in">
+      <div className="max-w-sm w-full ri-enter">
         <Card>
           <h1 className="text-xl font-bold mb-1">Forgot password?</h1>
           <p className="text-sm text-ri-text-mute mb-5">

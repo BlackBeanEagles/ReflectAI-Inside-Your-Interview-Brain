@@ -9,7 +9,6 @@ import type { CleanedResume, EvaluateResponse, ReportResponse, VoiceAnalysis } f
 import {
   Alert,
   Card,
-  CardBody,
   PrimaryButton,
   ProgressTrack,
   ROUND_ACCENT,
@@ -500,9 +499,7 @@ function InterviewSessionInner() {
         </div>
         {reportError && <Alert kind="error">{reportError}</Alert>}
         <Card>
-          <CardBody>
             <ReportView report={report} />
-          </CardBody>
         </Card>
       </div>
     );
@@ -542,7 +539,6 @@ function InterviewSessionInner() {
 
         {interviewComplete ? (
           <Card>
-            <CardBody>
               <Alert kind="success">
                 Interview session complete. {completionNotice} Generate your final report below when
                 you&apos;re ready.
@@ -557,22 +553,18 @@ function InterviewSessionInner() {
                   <Alert kind="error">{reportError}</Alert>
                 </div>
               )}
-            </CardBody>
           </Card>
         ) : interviewError ? (
           <Alert kind="error">{interviewError}</Alert>
         ) : nextLoading && !currentQuestion ? (
           <Card>
-            <CardBody>
               <Spinner label="Generating question… the first one takes longest while the model warms up." />
               <div className="mt-4">
                 <ProgressTrack />
               </div>
-            </CardBody>
           </Card>
         ) : currentQuestion ? (
           <Card key={count} className="ri-enter">
-            <CardBody>
               <RoundBadge round={round} />
               {/* The rule takes the active round's colour, so the escalation
                   shows in the question itself, not only in the label above it. */}
@@ -685,7 +677,6 @@ function InterviewSessionInner() {
                   </PrimaryButton>
                 </div>
               )}
-            </CardBody>
           </Card>
         ) : null}
       </div>
@@ -710,7 +701,6 @@ function InterviewSessionInner() {
       <RoundExplorer />
 
       <Card>
-        <CardBody>
         {setupError && (
           <div className="mb-4">
             <Alert kind="error">{setupError}</Alert>
@@ -779,7 +769,6 @@ function InterviewSessionInner() {
             {setupLoading ? "Parsing resume…" : "Start interview"}
           </PrimaryButton>
         </div>
-        </CardBody>
       </Card>
     </div>
   );

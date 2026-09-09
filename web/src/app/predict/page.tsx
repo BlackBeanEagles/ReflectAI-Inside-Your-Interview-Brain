@@ -126,7 +126,7 @@ export default function PredictedQuestionsPage() {
       </Card>
 
       {questions && (
-        <Card className="ri-fade-in">
+        <Card className="ri-enter">
           <p className="text-sm text-ri-text-mute mb-4">
             {questions.length} question(s) generated — grouped by category.
           </p>

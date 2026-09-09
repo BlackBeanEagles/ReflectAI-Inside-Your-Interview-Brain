@@ -161,7 +161,7 @@ export default function HistoryPage() {
                 const overall = item.report.overall_score;
                 const panelId = `session-detail-${item.session_id}`;
                 return (
-                  <Card key={item.session_id} className="!p-0 overflow-hidden">
+                  <Card key={item.session_id} flush className="overflow-hidden">
                     <button
                       onClick={() => setExpanded(isOpen ? null : item.session_id)}
                       aria-expanded={isOpen}
