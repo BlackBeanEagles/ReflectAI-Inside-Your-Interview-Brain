@@ -16,8 +16,8 @@ import {
   RoundProgress,
   ScorePanel,
   SecondaryButton,
-  Spinner,
   TextArea,
+  Thinking,
 } from "@/components/ui";
 import ReportView from "@/components/ReportView";
 import { ResumePicker } from "@/components/ResumePicker";
@@ -30,6 +30,7 @@ import {
   Lightbulb,
   Mic,
   RotateCcw,
+  Sparkles,
   Square,
   TriangleAlert,
   Volume2,
@@ -182,6 +183,7 @@ function InterviewSessionInner() {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   // The exact arguments of the last question fetch, so a failed one can be
   // retried as itself rather than forcing the user to start over.
@@ -596,6 +598,7 @@ function InterviewSessionInner() {
   }
 
   function handleResetInterview() {
+    setConfirmReset(false);
     clearSavedSession();
     setPhase("setup");
     setSessionId(null);
@@ -651,7 +654,12 @@ function InterviewSessionInner() {
   // ── Render: interview phase ─────────────────────────────────────────────
   if (phase === "interview") {
     return (
-      <div className="ri-enter space-y-5">
+      /* data-room swaps the token set wholesale for the stress round --
+         cooler, flatter surfaces, sharper corners, tighter line height,
+         faster motion. Scoped here rather than on <body> so the nav and
+         footer stay in the warm baseline and the shift reads as "this
+         round" rather than "the app changed". */
+      <div className="ri-enter space-y-5" data-room={round === "stress" ? "stress" : undefined}>
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -673,12 +681,40 @@ function InterviewSessionInner() {
                   {reportLoading ? "Generating…" : "Finish early"}
                 </SecondaryButton>
               )}
-              <SecondaryButton onClick={handleResetInterview}>
+              <SecondaryButton onClick={() => setConfirmReset(true)}>
                 <RotateCcw size={15} strokeWidth={1.75} aria-hidden />
                 Reset
               </SecondaryButton>
             </div>
           </div>
+
+          {/* Reset throws away every answer given so far and there is no undo.
+              It sat one click away from a button labelled with an icon, next
+              to the button people actually want. Irreversible actions get a
+              confirm step. */}
+          {confirmReset && (
+            <Card className="border-ri-stress/30">
+              <p className="text-sm">
+                <b>Discard this interview?</b>{" "}
+                <span className="text-ri-text-mute">
+                  {storedCount > 0
+                    ? `${storedCount} answered question${storedCount !== 1 ? "s" : ""} and their scores will be deleted. This can't be undone.`
+                    : "You'll go back to the setup screen and start over."}
+                </span>
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <SecondaryButton onClick={handleResetInterview} className="!text-ri-stress">
+                  Discard and start over
+                </SecondaryButton>
+                <SecondaryButton onClick={() => setConfirmReset(false)}>Keep going</SecondaryButton>
+                {storedCount > 0 && (
+                  <PrimaryButton onClick={handleGenerateReport} disabled={reportLoading}>
+                    {reportLoading ? "Generating…" : "Finish and get my report"}
+                  </PrimaryButton>
+                )}
+              </div>
+            </Card>
+          )}
           {/* Turns "how much longer is this?" from a guess into a glance --
               and the bar takes the round's colour, so the escalation into
               technical and stress is visible in the chrome, not just the badge. */}
@@ -727,14 +763,31 @@ function InterviewSessionInner() {
           </Card>
         ) : nextLoading && !currentQuestion ? (
           <Card>
-              <Spinner label="Generating question… the first one takes longest while the model warms up." />
+              <Thinking
+                label={
+                  count === 0
+                    ? "Reading your resume… the first question takes longest while the model warms up."
+                    : "Writing the next question…"
+                }
+              />
               <div className="mt-4">
                 <ProgressTrack />
               </div>
           </Card>
         ) : currentQuestion ? (
           <Card key={count} className="ri-enter">
-              <RoundBadge round={round} />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <RoundBadge round={round} />
+                {/* Disclosure belongs in the room, not only on the landing
+                    page. By the time someone is three questions deep and
+                    being scored, the marketing copy is long gone -- and this
+                    is exactly the point where a persona can quietly start
+                    reading as a person. */}
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-ri-text-mute">
+                  <Sparkles size={12} strokeWidth={1.75} aria-hidden />
+                  AI interviewer
+                </span>
+              </div>
               {/* The rule takes the active round's colour, so the escalation
                   shows in the question itself, not only in the label above it. */}
               <p
@@ -831,15 +884,10 @@ function InterviewSessionInner() {
 
               {evalResult && (
                 <div className="ri-enter mt-6 space-y-5 border-t border-ri-border pt-5">
-                  {/* Grid, not flex-wrap: there are five panels, so wrapping
-                      leaves the last alone on its row where flex-1 stretches it
-                      to full width -- one giant ring beside two small ones. */}
-                  <div className="ri-stagger grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap">
-                    <ScorePanel label="Overall" score={evalResult.final_score} />
-                    {Object.entries(evalResult.scores).map(([dim, val]) => (
-                      <ScorePanel key={dim} label={dim} score={val} />
-                    ))}
-                  </div>
+                  {/* Feedback first, scores second. What actually helps someone
+                      improve is "you paused before the result" -- the number is
+                      a summary of that, not a replacement for it. Leading with
+                      the number invites people to read the score and stop. */}
                   <dl className="ri-stagger space-y-3">
                     <FeedbackLine Icon={Check} label="Strength" tone="var(--ri-good-line)">
                       {evalResult.feedback.strength}
@@ -851,6 +899,16 @@ function InterviewSessionInner() {
                       {evalResult.feedback.improvement}
                     </FeedbackLine>
                   </dl>
+
+                  {/* Grid, not flex-wrap: there are five panels, so wrapping
+                      leaves the last alone on its row where flex-1 stretches it
+                      to full width -- one giant ring beside two small ones. */}
+                  <div className="ri-stagger grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap">
+                    <ScorePanel label="Overall" score={evalResult.final_score} />
+                    {Object.entries(evalResult.scores).map(([dim, val]) => (
+                      <ScorePanel key={dim} label={dim} score={val} />
+                    ))}
+                  </div>
                   <PrimaryButton onClick={handleNext} disabled={nextLoading}>
                     {nextLoading ? "Loading next question…" : "Next question"}
                     <ArrowRight size={15} strokeWidth={1.75} aria-hidden />

@@ -43,6 +43,17 @@
   --ri-text-mute: #6a645a;
   --ri-track: #eae6dc;
 
+  /* Shape and motion as tokens, not per-component Tailwind classes. This is
+     what lets the stress round be a different ROOM rather than a re-skin:
+     one selector overrides these and every card, control and field follows.
+     Hardcoding rounded-xl on each component would mean the two rooms drift
+     apart the moment anyone adds a third. */
+  --ri-radius-card: 0.75rem;
+  --ri-radius-control: 0.5rem;
+  --ri-leading: 1.6;
+  --ri-motion: 260ms;
+  --ri-motion-fast: 150ms;
+
   /* Page texture. A dot grid and one soft wash behind the top of the
      document -- the two ways to give a ground depth without inventing
      something for the eye to look at. Both are near-threshold on purpose:
@@ -164,6 +175,45 @@
   --foreground: var(--ri-text);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   The stress room
+   ───────────────────────────────────────────────────────────────────────
+   The interview escalates HR -> technical -> stress, and the stress round
+   is meant to feel less accommodating than the two before it. Rather than
+   re-skinning components, the whole room swaps: surfaces go cooler and
+   flatter, corners sharpen, line height tightens and motion shortens.
+
+   It is a token override on one wrapper, so the two rooms share every
+   component and cannot drift apart. Everything semantic -- score colours,
+   the accent, alert kinds -- is deliberately left alone: the room changes
+   how it FEELS, never what a colour means.
+
+   Scoped to [data-room="stress"] rather than a body class so it nests: the
+   nav and footer outside the wrapper stay in the warm baseline, which is
+   what keeps the shift readable as "this round" instead of "the app
+   changed".
+   ═══════════════════════════════════════════════════════════════════════ */
+[data-room="stress"] {
+  --ri-surface: #fbfbfc;
+  --ri-surface-alt: #f1f2f5;
+  --ri-surface-mute: #e9eaef;
+  --ri-border: #dcdee5;
+  --ri-border-strong: #c2c6d0;
+  --ri-text: #14161c;
+  --ri-text-mute: #5c6270;
+  --ri-track: #e4e6ec;
+
+  /* Flatter: less lift, so the room feels harder-surfaced. */
+  --ri-shadow: 0 1px 2px rgba(20, 22, 28, 0.05);
+  --ri-shadow-lift: 0 1px 3px rgba(20, 22, 28, 0.08);
+
+  --ri-radius-card: 0.375rem;
+  --ri-radius-control: 0.25rem;
+  --ri-leading: 1.45;
+  --ri-motion: 160ms;
+  --ri-motion-fast: 90ms;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -201,6 +251,9 @@
   --color-ri-purple-line: var(--ri-purple-line);
   --color-ri-chip-bg: var(--ri-chip-bg);
   --color-ri-chip-fg: var(--ri-chip-fg);
+
+  --radius-ri-card: var(--ri-radius-card);
+  --radius-ri-control: var(--ri-radius-control);
 
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
 }
@@ -306,6 +359,19 @@ body {
   50%      { opacity: 0.3; }
 }
 .ri-rec { animation: ri-rec 1.4s ease-in-out infinite; }
+
+/* The interviewer considering your answer. Deliberately NOT the same as the
+   spinner used for "a request is in flight": a spinner reads as the machine
+   working, three settling dots read as someone thinking, and in a product
+   that is meant to feel like a conversation those are different events even
+   at identical latency. */
+@keyframes ri-think {
+  0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+  30%           { opacity: 1; transform: translateY(-2px); }
+}
+.ri-think > span { animation: ri-think 1.3s ease-in-out infinite; }
+.ri-think > span:nth-child(2) { animation-delay: 0.18s; }
+.ri-think > span:nth-child(3) { animation-delay: 0.36s; }
 
 /* Indeterminate bar for model calls, whose duration genuinely is unknown. */
 @keyframes ri-indeterminate {

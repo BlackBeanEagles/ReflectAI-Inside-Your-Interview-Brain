@@ -42,7 +42,7 @@ export function ScorePanel({
   const offset = len * (1 - pct);
 
   return (
-    <div className="min-w-[104px] flex-1 rounded-lg border border-ri-border bg-ri-surface p-3 text-center transition-shadow duration-200 hover:shadow-[var(--ri-shadow-lift)]">
+    <div className="min-w-[104px] flex-1 rounded-ri-control border border-ri-border bg-ri-surface p-3 text-center transition-shadow duration-200 hover:shadow-[var(--ri-shadow-lift)]">
       <div className="relative mx-auto" style={{ width: box, height: box }}>
         <svg width={box} height={box} viewBox={`0 0 ${box} ${box}`} className="-rotate-90">
           <circle cx={box / 2} cy={box / 2} r={r} fill="none" stroke="var(--ri-track)" strokeWidth={stroke} />
@@ -125,7 +125,7 @@ export function Card({
   // pages did exactly that. Defaults should be what most callers want.
   return (
     <div
-      className={`rounded-xl border border-ri-border bg-ri-surface shadow-[var(--ri-shadow)] ${
+      className={`rounded-ri-card border border-ri-border bg-ri-surface shadow-[var(--ri-shadow)] ${
         flush ? "" : "p-5"
       } ${className}`}
     >
@@ -139,7 +139,7 @@ export function Card({
 // it takes two seconds. transition covers transform too, so the release eases
 // back rather than snapping.
 const BTN_BASE =
-  "ri-focus inline-flex items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium " +
+  "ri-focus inline-flex items-center justify-center gap-2 rounded-ri-control px-4 text-sm font-medium " +
   "transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed " +
   "disabled:opacity-50 disabled:active:scale-100";
 
@@ -194,7 +194,7 @@ export function SecondaryButton({
 }
 
 const FIELD_CLASS =
-  "w-full rounded-lg border border-ri-border bg-ri-surface px-3 py-2 text-sm text-ri-text " +
+  "w-full rounded-ri-control border border-ri-border bg-ri-surface px-3 py-2 text-sm text-ri-text " +
   "transition-colors placeholder:text-ri-text-mute/60 focus:border-ri-accent focus:outline-none " +
   "focus:ring-2 focus:ring-ri-accent/25";
 
@@ -293,7 +293,7 @@ export function Alert({
   return (
     <div
       role={kind === "error" ? "alert" : "status"}
-      className={`rounded-lg border px-3.5 py-2.5 text-sm ${ALERT_STYLES[kind]}`}
+      className={`rounded-ri-control border px-3.5 py-2.5 text-sm ${ALERT_STYLES[kind]}`}
     >
       {children}
     </div>
@@ -307,6 +307,23 @@ export function Spinner({ label }: { label?: string }) {
         aria-hidden
         className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-ri-border border-t-ri-accent"
       />
+      {label}
+    </div>
+  );
+}
+
+/** "The interviewer is considering your answer." Distinct from <Spinner>,
+ *  which means "a request is in flight" -- the two read differently even at
+ *  the same latency, and in a product built to feel like a conversation that
+ *  difference is worth carrying in the UI. */
+export function Thinking({ label = "Considering your answer" }: { label?: string }) {
+  return (
+    <div role="status" className="flex items-center gap-2.5 text-sm text-ri-text-mute">
+      <span className="ri-think flex items-center gap-1" aria-hidden>
+        <span className="h-1.5 w-1.5 rounded-full bg-ri-text-mute" />
+        <span className="h-1.5 w-1.5 rounded-full bg-ri-text-mute" />
+        <span className="h-1.5 w-1.5 rounded-full bg-ri-text-mute" />
+      </span>
       {label}
     </div>
   );
