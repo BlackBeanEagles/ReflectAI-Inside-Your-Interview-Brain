@@ -20,7 +20,7 @@ export default function Image() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          background: "#101216",
+          background: "#faf9f6",
           padding: 80,
         }}
       >
@@ -30,11 +30,11 @@ export default function Image() {
               width: 10,
               height: 10,
               borderRadius: 999,
-              background: "#8b9bff",
+              background: "#4f46e5",
               display: "flex",
             }}
           />
-          <div style={{ fontSize: 26, color: "#98a0ae", letterSpacing: 2 }}>
+          <div style={{ fontSize: 26, color: "#6a645a", letterSpacing: 2 }}>
             REFLECTINTERVIEW
           </div>
         </div>
@@ -44,7 +44,7 @@ export default function Image() {
             style={{
               fontSize: 82,
               lineHeight: 1.05,
-              color: "#e8eaf0",
+              color: "#1c1a17",
               letterSpacing: -2.5,
               maxWidth: 900,
               display: "flex",
@@ -52,7 +52,7 @@ export default function Image() {
           >
             Practice the interview before it counts.
           </div>
-          <div style={{ fontSize: 30, color: "#98a0ae", marginTop: 28, maxWidth: 820, display: "flex" }}>
+          <div style={{ fontSize: 30, color: "#6a645a", marginTop: 28, maxWidth: 820, display: "flex" }}>
             An adaptive mock interview built from your own resume — scored, with
             specific feedback on every answer.
           </div>
@@ -62,15 +62,15 @@ export default function Image() {
             product uses, so the card previews the actual thing. */}
         <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
           {[
-            { label: "HR round", color: "#8b9bff" },
-            { label: "Technical round", color: "#e08b3c" },
-            { label: "Stress round", color: "#f07185" },
+            { label: "HR round", color: "#4f46e5" },
+            { label: "Technical round", color: "#a2570a" },
+            { label: "Stress round", color: "#b3223f" },
           ].map((r) => (
             <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div
                 style={{ width: 34, height: 3, borderRadius: 999, background: r.color, display: "flex" }}
               />
-              <div style={{ fontSize: 25, color: "#98a0ae" }}>{r.label}</div>
+              <div style={{ fontSize: 25, color: "#6a645a" }}>{r.label}</div>
             </div>
           ))}
         </div>

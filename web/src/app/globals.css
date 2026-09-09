@@ -13,59 +13,74 @@
    no referent is noise competing with the three signals that matter.
 
    Every colour is defined on bare :root first and only re-pointed in the
-   dark block, so nothing can be defined for one scheme and missing in
-   the other.
+   opt-in dark block, so nothing can be defined for one scheme and missing
+   in the other. The product ships light; dark is available by setting
+   data-theme="dark" on <html> and is not wired to the OS preference.
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
   /* ── Surfaces & ink ─────────────────────────────────────────────────
-     A slight cool cast rather than pure neutral grey -- flat #fff/#000
-     surfaces look unresolved next to the indigo accent. The page sits a
-     shade off from card surfaces so a card reads as raised without
-     needing a shadow to prove it. */
-  --ri-page-bg: #f7f8fb;
-  --ri-surface: #ffffff;
-  --ri-surface-alt: #f4f6fa;
-  --ri-surface-mute: #eef1f7;
-  --ri-border: #e2e6ee;
-  --ri-border-strong: #cfd5e2;
-  --ri-text: #16181d;
-  --ri-text-mute: #5c6270;
-  --ri-track: #e6e9f0;
+     A warm paper ground rather than cool grey. Two reasons, and neither
+     is taste for its own sake:
 
-  /* Tight, low-alpha shadows. A large soft glow reads as decoration; a
-     small shadow reads as elevation. */
-  --ri-shadow: 0 1px 2px rgba(20, 24, 35, 0.05), 0 1px 3px rgba(20, 24, 35, 0.04);
-  --ri-shadow-lift: 0 2px 4px rgba(20, 24, 35, 0.06), 0 8px 20px rgba(20, 24, 35, 0.08);
+     · Cool grey (#f7f8fb and friends) is the default every UI kit ships,
+       so it reads as un-designed. A warm ground is an actual decision and
+       costs nothing.
+     · The accent is a cool indigo and the score colours run green through
+       amber to rose. Warm paper puts the cool accent in relief and lets
+       the warm score colours sit down instead of vibrating, which is what
+       they do against a blue-grey.
+
+     Cards stay pure white so they lift off the page without needing a
+     heavy shadow to prove it. */
+  --ri-page-bg: #faf9f6;
+  --ri-surface: #ffffff;
+  --ri-surface-alt: #f4f2ec;
+  --ri-surface-mute: #eeebe3;
+  --ri-border: #e6e1d7;
+  --ri-border-strong: #d2cabb;
+  --ri-text: #1c1a17;
+  --ri-text-mute: #6a645a;
+  --ri-track: #eae6dc;
+
+  /* Warm-tinted shadows. A neutral-black shadow over a warm ground reads
+     as a grey smudge; tinting it to the ground keeps it looking like
+     shade rather than dirt. */
+  --ri-shadow: 0 1px 2px rgba(60, 50, 35, 0.05), 0 1px 3px rgba(60, 50, 35, 0.04);
+  --ri-shadow-lift: 0 2px 4px rgba(60, 50, 35, 0.06), 0 8px 20px rgba(60, 50, 35, 0.09);
 
   /* ── The one accent ── */
-  --ri-accent: #4a5bd4;
-  --ri-accent-hover: #3d4cba;
-  --ri-accent-soft: #eef0fc;
+  --ri-accent: #4f46e5;
+  --ri-accent-hover: #4338ca;
+  --ri-accent-soft: #eeecfd;
 
   /* ── Round identity ─────────────────────────────────────────────────
      The interview escalates HR -> technical -> stress, so the hues warm
      as it does. This is the one place a colour progression does real
-     work: you can tell which round you are in without reading the badge. */
-  --ri-hr: #4a5bd4;
-  --ri-tech: #b4620a;
-  --ri-stress: #b32a45;
+     work: you can tell which round you are in without reading the badge.
+     All three clear 4.5:1 on white, so they are safe as label text and
+     not only as decoration. */
+  --ri-hr: #4f46e5;
+  --ri-tech: #a2570a;
+  --ri-stress: #b3223f;
 
-  /* ── Score bands & message kinds ── */
-  --ri-good-bg: #edf9f1;
+  /* ── Score bands & message kinds ────────────────────────────────────
+     Tints are warm-shifted to sit on the paper ground; the line colours
+     are the ones that carry meaning and all clear 4.5:1 on white. */
+  --ri-good-bg: #edf7ee;
   --ri-good-fg: #14532d;
-  --ri-good-line: #17803d;
-  --ri-warn-bg: #fdf5e9;
-  --ri-warn-fg: #703c08;
-  --ri-warn-line: #b4620a;
-  --ri-info-bg: #eef0fc;
-  --ri-info-fg: #27317d;
-  --ri-info-line: #4a5bd4;
-  --ri-purple-bg: #f2effc;
-  --ri-purple-fg: #3f2d8c;
-  --ri-purple-line: #6d55c4;
-  --ri-chip-bg: #eef1f7;
-  --ri-chip-fg: #3a414f;
+  --ri-good-line: #15803d;
+  --ri-warn-bg: #fdf4e7;
+  --ri-warn-fg: #6b3a08;
+  --ri-warn-line: #a2570a;
+  --ri-info-bg: #eeecfd;
+  --ri-info-fg: #2a2585;
+  --ri-info-line: #4f46e5;
+  --ri-purple-bg: #f4f0fb;
+  --ri-purple-fg: #46297f;
+  --ri-chip-bg: #f0ede5;
+  --ri-chip-fg: #46413a;
+  --ri-purple-line: #7c4ddb;
 
   /* ── Chart series ───────────────────────────────────────────────────
      Deliberately NOT the round accents above. As adjacent lines on a
@@ -84,51 +99,55 @@
   --foreground: var(--ri-text);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ri-page-bg: #101216;
-    --ri-surface: #171a20;
-    --ri-surface-alt: #1c2027;
-    --ri-surface-mute: #21252d;
-    --ri-border: #2a2f39;
-    --ri-border-strong: #3a4150;
-    --ri-text: #e8eaf0;
-    --ri-text-mute: #98a0ae;
-    --ri-track: #272c35;
+/* Dark is opt-in, NOT tied to prefers-color-scheme. The product is
+   designed light: the warm paper ground and the relief it gives the cool
+   accent are the point, and following the OS meant most people never saw
+   it. These values stay defined and maintained so a theme toggle can be
+   added later by setting data-theme="dark" on <html> -- nothing else needs
+   to change for that to work. */
+:root[data-theme="dark"] {
+  --ri-page-bg: #101216;
+  --ri-surface: #171a20;
+  --ri-surface-alt: #1c2027;
+  --ri-surface-mute: #21252d;
+  --ri-border: #2a2f39;
+  --ri-border-strong: #3a4150;
+  --ri-text: #e8eaf0;
+  --ri-text-mute: #98a0ae;
+  --ri-track: #272c35;
 
-    --ri-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
-    --ri-shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.45), 0 10px 24px rgba(0, 0, 0, 0.4);
+  --ri-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --ri-shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.45), 0 10px 24px rgba(0, 0, 0, 0.4);
 
-    --ri-accent: #8b9bff;
-    --ri-accent-hover: #a3b0ff;
-    --ri-accent-soft: #1e2340;
+  --ri-accent: #8b9bff;
+  --ri-accent-hover: #a3b0ff;
+  --ri-accent-soft: #1e2340;
 
-    --ri-hr: #8b9bff;
-    --ri-tech: #e08b3c;
-    --ri-stress: #f07185;
+  --ri-hr: #8b9bff;
+  --ri-tech: #e08b3c;
+  --ri-stress: #f07185;
 
-    --ri-good-bg: #122c1e;
-    --ri-good-fg: #86dfa8;
-    --ri-good-line: #35a565;
-    --ri-warn-bg: #2e2110;
-    --ri-warn-fg: #edb87f;
-    --ri-warn-line: #d4802f;
-    --ri-info-bg: #1e2340;
-    --ri-info-fg: #b0bcff;
-    --ri-info-line: #7386ff;
-    --ri-purple-bg: #241d3a;
-    --ri-purple-fg: #c2b0f0;
-    --ri-purple-line: #8b73d8;
-    --ri-chip-bg: #242932;
-    --ri-chip-fg: #b6bdcb;
+  --ri-good-bg: #122c1e;
+  --ri-good-fg: #86dfa8;
+  --ri-good-line: #35a565;
+  --ri-warn-bg: #2e2110;
+  --ri-warn-fg: #edb87f;
+  --ri-warn-line: #d4802f;
+  --ri-info-bg: #1e2340;
+  --ri-info-fg: #b0bcff;
+  --ri-info-line: #7386ff;
+  --ri-purple-bg: #241d3a;
+  --ri-purple-fg: #c2b0f0;
+  --ri-purple-line: #8b73d8;
+  --ri-chip-bg: #242932;
+  --ri-chip-fg: #b6bdcb;
 
-    --ri-series-hr: #6b78ee;
-    --ri-series-tech: #c4650f;
-    --ri-series-stress: #b93cc4;
+  --ri-series-hr: #6b78ee;
+  --ri-series-tech: #c4650f;
+  --ri-series-stress: #b93cc4;
 
-    --background: var(--ri-page-bg);
-    --foreground: var(--ri-text);
-  }
+  --background: var(--ri-page-bg);
+  --foreground: var(--ri-text);
 }
 
 @theme inline {
