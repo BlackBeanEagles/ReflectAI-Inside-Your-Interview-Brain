@@ -185,6 +185,7 @@ function InterviewSessionInner() {
   const [reportError, setReportError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmFinish, setConfirmFinish] = useState(false);
 
   // The exact arguments of the last question fetch, so a failed one can be
   // retried as itself rather than forcing the user to start over.
@@ -600,6 +601,7 @@ function InterviewSessionInner() {
 
   function handleResetInterview() {
     setConfirmReset(false);
+    setConfirmFinish(false);
     clearSavedSession();
     setPhase("setup");
     setSessionId(null);
@@ -680,7 +682,7 @@ function InterviewSessionInner() {
                   questions are done was withholding something already paid
                   for. Reset was the only other exit, and it destroys them. */}
               {storedCount > 0 && !interviewComplete && (
-                <SecondaryButton onClick={handleGenerateReport} disabled={reportLoading}>
+                <SecondaryButton onClick={() => setConfirmFinish(true)} disabled={reportLoading}>
                   {reportLoading ? "Generating…" : "Finish early"}
                 </SecondaryButton>
               )}
@@ -695,6 +697,29 @@ function InterviewSessionInner() {
               It sat one click away from a button labelled with an icon, next
               to the button people actually want. Irreversible actions get a
               confirm step. */}
+          {/* Finishing early is not destructive the way Reset is -- the answers
+              survive -- but it does end the interview on one click and build
+              the report from a partial session. Same confirm shape as Reset,
+              and it names the number so the trade is explicit. */}
+          {confirmFinish && (
+            <Card>
+              <p className="text-sm">
+                <b>Finish now?</b>{" "}
+                <span className="text-ri-text-mute">
+                  {`You've answered ${storedCount} of ${MAX_QUESTIONS} — your report will be built from just those.`}
+                </span>
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <PrimaryButton onClick={handleGenerateReport} disabled={reportLoading}>
+                  {reportLoading ? "Generating…" : "Finish and get my report"}
+                </PrimaryButton>
+                <SecondaryButton onClick={() => setConfirmFinish(false)} disabled={reportLoading}>
+                  Keep going
+                </SecondaryButton>
+              </div>
+            </Card>
+          )}
+
           {confirmReset && (
             <Card className="border-ri-stress/30">
               <p className="text-sm">

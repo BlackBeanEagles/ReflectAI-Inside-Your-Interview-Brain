@@ -141,11 +141,13 @@ export default function ReportView({ report }: { report: ReportResponse }) {
           )}
           {report.consistency && <p className="text-sm mb-1"><b>Consistency:</b> {report.consistency}</p>}
           {report.pressure_performance && <p className="text-sm mb-3"><b>Under pressure:</b> {report.pressure_performance}</p>}
-          {report.behavior_summary && (
-            <div className="bg-ri-surface-alt border border-ri-border rounded-xl p-4 text-sm">
-              {report.behavior_summary}
-            </div>
-          )}
+          {/* behavior_summary is cut, not restyled. Observed on a real report:
+              it renders "Strong in Structure -- solid scores in 1/1 answers"
+              and the Strengths list below it renders the same sentence
+              verbatim. The report already carries two synthesised paragraphs
+              that say something the lists do not -- report.summary at the top
+              and the cognitive coach summary below -- so this third one was
+              purely the bullets in prose form. */}
           {/* strength_patterns / weakness_patterns are merged into the
               Strengths and Weaknesses sections below rather than repeated
               here -- they overlap almost entirely in practice. */}
@@ -157,13 +159,17 @@ export default function ReportView({ report }: { report: ReportResponse }) {
         <section>
           <h3 className="font-bold text-sm mb-3">Cognitive Profile</h3>
           {cog.thinking_fingerprint && (
-            <p className="text-sm mb-2">
-              <b>Analytical depth:</b> {cog.thinking_fingerprint.analytical_depth || "—"} ·{" "}
-              <b>Impulsivity:</b> {cog.thinking_fingerprint.impulsivity || "—"} ·{" "}
-              <b>Clarity:</b> {cog.thinking_fingerprint.clarity || "—"} ·{" "}
-              <b>Consistency:</b> {cog.thinking_fingerprint.consistency || "—"} ·{" "}
-              <b>Confidence:</b> {cog.thinking_fingerprint.confidence || "—"}
-            </p>
+            <dl className="mb-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+              <TraitMeter label="Analytical depth" level={cog.thinking_fingerprint.analytical_depth} />
+              <TraitMeter label="Clarity" level={cog.thinking_fingerprint.clarity} />
+              <TraitMeter label="Consistency" level={cog.thinking_fingerprint.consistency} />
+              <TraitMeter label="Confidence" level={cog.thinking_fingerprint.confidence} />
+              <TraitMeter
+                label="Impulsivity"
+                level={cog.thinking_fingerprint.impulsivity}
+                higherIsBetter={false}
+              />
+            </dl>
           )}
           {cog.thinking_style && (
             <p className="text-sm mb-2">
@@ -187,12 +193,71 @@ export default function ReportView({ report }: { report: ReportResponse }) {
       {allWeaknesses.length > 0 && (
         <ListSection title="Weaknesses" items={allWeaknesses} kind="weakness" />
       )}
-      {report.patterns.length > 0 && (
-        <ListSection title="Patterns Detected" items={report.patterns} kind="pattern" />
-      )}
+      {/* "Patterns Detected" is cut rather than restyled: it repeated the
+          Strengths and Weaknesses lists above it in different wording, and
+          from a single evaluated answer the report was stating two facts in
+          six boxes. Anything genuinely new in report.patterns still reaches
+          the reader through the behavioural paragraph. */}
       {report.recommendations.length > 0 && (
         <ListSection title="Recommendations" items={report.recommendations} kind="rec" />
       )}
+    </div>
+  );
+}
+
+/**
+ * One cognitive trait as a three-step meter.
+ *
+ * Stepped, NOT a percentage bar. The backend's build_thinking_fingerprint
+ * returns Dict[str, str] -- literally the words "low", "medium" or "high"
+ * from _score_to_tri_level. Rendering that as a smooth width:66% bar would
+ * dress three buckets up as a continuous measurement and imply precision
+ * that does not exist behind it. Three segments say exactly what is known.
+ *
+ * higherIsBetter is not decoration either: high impulsivity is a finding to
+ * act on, while high clarity is a good result. Filling both in the same
+ * colour would tell someone their impulsivity score is going well.
+ */
+function TraitMeter({
+  label,
+  level,
+  higherIsBetter = true,
+}: {
+  label: string;
+  level?: string | null;
+  higherIsBetter?: boolean;
+}) {
+  const normalised = (level || "").trim().toLowerCase();
+  const steps = normalised === "high" ? 3 : normalised === "medium" ? 2 : normalised === "low" ? 1 : 0;
+
+  const favourable = higherIsBetter ? steps >= 3 : steps <= 1;
+  const middling = steps === 2;
+  const tone =
+    steps === 0
+      ? "var(--ri-border-strong)"
+      : favourable
+        ? "var(--ri-good-line)"
+        : middling
+          ? "var(--ri-warn-line)"
+          : "var(--ri-stress)";
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3">
+        <dt className="text-sm">{label}</dt>
+        <dd className="text-xs font-medium capitalize" style={{ color: tone }}>
+          {normalised || "not enough data"}
+        </dd>
+      </div>
+      <div className="mt-1.5 flex gap-1" aria-hidden>
+        {[1, 2, 3].map((i) => (
+          <span
+            key={i}
+            className="h-1.5 flex-1 rounded-full transition-colors"
+            style={{ background: i <= steps ? tone : "var(--ri-track)" }}
+          />
+        ))}
+      </div>
     </div>
   );
 }

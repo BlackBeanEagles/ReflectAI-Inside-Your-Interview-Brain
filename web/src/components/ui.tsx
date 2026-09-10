@@ -46,15 +46,16 @@ export function ScorePanel({
   label: string;
   score: number | null | undefined;
   size?: "sm" | "md";
-  /** Marks the panel as belonging to a round, shown as a small dot beside
-   *  the label. The RING deliberately stays score-coloured: on the report
-   *  the four dials are Overall/HR/Technical/Stress, and recolouring them by
-   *  round would trade away the good/fair/poor signal -- which is the thing
-   *  a score dial exists to convey -- for identity the label already gives.
-   *  The dot adds the round without spending the ring on it. */
+  /** Marks the panel as belonging to a round. The RING takes the round's
+   *  colour and the numeral keeps the score colour, so both signals survive:
+   *  the arc says which round, its length says how much, and the number's
+   *  colour says good / fair / poor. Colouring the ring by score AND the
+   *  numeral by score spent two channels on one fact while the round system
+   *  never reached this screen at all. */
   round?: string;
 }) {
   const color = scoreColor(score);
+  const ringColor = (round && ROUND_ACCENT[round]) || color;
 
   const r = size === "sm" ? 19 : 24;
   const stroke = size === "sm" ? 3 : 3.5;
@@ -75,7 +76,7 @@ export function ScorePanel({
               cy={box / 2}
               r={r}
               fill="none"
-              stroke={color}
+              stroke={ringColor}
               strokeWidth={stroke}
               strokeLinecap="round"
               strokeDasharray={len}
