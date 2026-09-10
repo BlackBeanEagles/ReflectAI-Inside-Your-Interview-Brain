@@ -5,6 +5,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { ResumeProvider } from "@/lib/resume-context";
 import Nav from "@/components/Nav";
 import ServiceWorker from "@/components/ServiceWorker";
+import { Grain } from "@/components/Ambience";
 
 // No `weight` array on purpose: that loads static instances, and the type
 // scale here uses intermediate weights (640, 680) that would otherwise snap
@@ -67,6 +68,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
+        <Grain />
         <ServiceWorker />
         <AuthProvider>
           <ResumeProvider>

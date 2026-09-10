@@ -22,6 +22,7 @@ import {
 import ReportView from "@/components/ReportView";
 import { ResumePicker } from "@/components/ResumePicker";
 import RoundExplorer from "@/components/RoundExplorer";
+import { RoomAmbience } from "@/components/Ambience";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
@@ -660,6 +661,8 @@ function InterviewSessionInner() {
          footer stay in the warm baseline and the shift reads as "this
          round" rather than "the app changed". */
       <div className="ri-enter space-y-5" data-room={round === "stress" ? "stress" : undefined}>
+        {/* The room takes the colour of the round in play. */}
+        <RoomAmbience round={round} />
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>

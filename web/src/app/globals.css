@@ -62,6 +62,8 @@
   --ri-grid-size: 22px;
   --ri-wash: color-mix(in srgb, var(--ri-accent) 16%, transparent);
   --ri-wash-2: color-mix(in srgb, var(--ri-tech) 11%, transparent);
+  --ri-grain: 0.05;
+  --ri-vignette: rgba(74, 62, 40, 0.05);
 
   /* Warm-tinted shadows. A neutral-black shadow over a warm ground reads
      as a grey smudge; tinting it to the ground keeps it looking like
@@ -140,6 +142,8 @@
   --ri-grid-size: 22px;
   --ri-wash: color-mix(in srgb, var(--ri-accent) 12%, transparent);
   --ri-wash-2: color-mix(in srgb, var(--ri-tech) 8%, transparent);
+  --ri-grain: 0.07;
+  --ri-vignette: rgba(0, 0, 0, 0.28);
 
   --ri-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
   --ri-shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.45), 0 10px 24px rgba(0, 0, 0, 0.4);
@@ -173,6 +177,73 @@
 
   --background: var(--ri-page-bg);
   --foreground: var(--ri-text);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Paper grain and vignette
+   ───────────────────────────────────────────────────────────────────────
+   Two static layers on one fixed, non-interactive overlay.
+
+   The grain is the thing that makes a flat colour read as a SURFACE rather
+   than an absence of one. It also does real work: large soft gradients band
+   visibly on 8-bit displays, and a little noise dithers those bands away.
+
+   The vignette darkens the far edges by a few percent, which quietly pulls
+   the eye back to the centre column where all the content actually lives.
+   Both are fixed rather than scrolling -- they are the light in the room,
+   not marks on the page, so they should not travel with the content.
+
+   Nothing here animates. It is texture, not motion.
+   ═══════════════════════════════════════════════════════════════════════ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: radial-gradient(
+    120% 100% at 50% 50%,
+    transparent 55%,
+    var(--ri-vignette) 100%
+  );
+}
+
+/* The noise tile is drawn at full strength above; this is what actually
+   dials it back. Kept as its own layer so the vignette stays at full
+   strength while the grain is barely there. */
+.ri-grain {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--ri-grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Room ambience
+   ───────────────────────────────────────────────────────────────────────
+   A soft wash behind the interview, tinted by the round in play. The round
+   already shows on the badge, the question rule and the progress bar; this
+   puts it in the light of the room itself, so the escalation from HR
+   through technical to stress is something you feel before you read it.
+
+   It is a colour transition on a state change -- the round -- rather than
+   ambient motion, which is why it is allowed to move at all. The duration
+   is long deliberately: a round change should feel like the lights shifting,
+   not like a tab switch.
+   ═══════════════════════════════════════════════════════════════════════ */
+.ri-ambience {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(70% 55% at 50% 0%, var(--ri-ambience-tint), transparent 70%),
+    radial-gradient(45% 40% at 85% 100%, var(--ri-ambience-tint), transparent 72%);
+  background-repeat: no-repeat, no-repeat;
+  transition: background-image 900ms ease, opacity 900ms ease;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
