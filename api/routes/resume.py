@@ -220,6 +220,7 @@ def next_question_endpoint(request: NextQuestionRequest):
         question_count=request.count,
         cleaned_data=cleaned_data,
         used_skills=request.used_skills,
+        asked_questions=request.asked_questions,
         current_round=request.current_round,
         score_history=request.score_history,
         difficulty=request.difficulty,

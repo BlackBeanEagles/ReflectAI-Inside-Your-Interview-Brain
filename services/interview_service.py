@@ -103,6 +103,7 @@ def run_interview_step(
     text: Optional[str] = None,
     pdf_bytes: Optional[bytes] = None,
     used_skills: Optional[List[str]] = None,
+    asked_questions: Optional[List[str]] = None,
     current_round: str = "hr",
     score_history: Optional[List[float]] = None,
     difficulty: str = "medium",
@@ -126,6 +127,10 @@ def run_interview_step(
         text:           Raw resume text (used if cleaned_data is not provided).
         pdf_bytes:      Raw PDF bytes (used if cleaned_data is not provided).
         used_skills:    Skills already asked about — prevents repetition in Technical round.
+        asked_questions: Questions already asked, verbatim. used_skills only
+                        steers which skill is chosen; the agent needs the
+                        questions themselves to avoid rewording one it has
+                        already asked.
         current_round:  Current state: hr, technical, stress, or end.
         score_history:  Recent final scores used by the adaptive engine.
         difficulty:     Current adaptive difficulty.
@@ -150,6 +155,8 @@ def run_interview_step(
     """
     if used_skills is None:
         used_skills = []
+    if asked_questions is None:
+        asked_questions = []
     if score_history is None:
         score_history = []
 
@@ -229,6 +236,7 @@ def run_interview_step(
                 difficulty=decision["difficulty"],
                 role=role,
                 language=language,
+                asked_questions=asked_questions,
             )
     except Exception as e:
         logger.error("interview_service: Agent execution failed: %s", str(e))

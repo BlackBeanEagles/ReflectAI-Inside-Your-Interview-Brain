@@ -37,7 +37,11 @@ LLM_ERROR_PREFIXES = (
 # ─── Prompt Builders ──────────────────────────────────────────────────────────
 
 def _build_skill_prompt(
-    skill: str, difficulty: str = "medium", role: Optional[str] = None, language: Optional[str] = None,
+    skill: str,
+    difficulty: str = "medium",
+    role: Optional[str] = None,
+    language: Optional[str] = None,
+    asked_questions: Optional[List[str]] = None,
 ) -> str:
     """
     Day 3 style — skill-only technical question prompt.
@@ -67,12 +71,36 @@ Rules — follow every rule strictly:
 Output only the question — nothing else:"""
 
 
+def _avoid_block(asked_questions: Optional[List[str]]) -> str:
+    """
+    Renders previously-asked questions as an explicit avoid-list.
+
+    used_skills alone was never enough to stop repetition: it filters which
+    SKILL gets picked, but the model has no idea what it already said, so it
+    would re-ask the same thing about the same project in different words.
+    Showing it the actual questions is the only signal that can prevent that.
+
+    Capped at the last 8. The whole point of the technical round is that the
+    prompt stays small and fast; an unbounded transcript would grow every
+    turn and is not needed to spot a near-duplicate.
+    """
+    recent = [q.strip() for q in (asked_questions or []) if q and q.strip()][-8:]
+    if not recent:
+        return ""
+    listed = "\n".join(f"  - {q}" for q in recent)
+    return (
+        "\nAlready asked in this interview — do NOT ask any of these again, "
+        "and do not rephrase them:\n" + listed + "\n"
+    )
+
+
 def _build_context_prompt(
     skills: List[str],
     project: str,
     difficulty: str = "medium",
     role: Optional[str] = None,
     language: Optional[str] = None,
+    asked_questions: Optional[List[str]] = None,
 ) -> str:
     """
     Day 4 style — context-aware prompt that links a skill to a real project.
@@ -88,8 +116,9 @@ Your task is to ask ONE technical question based on the candidate's real project
 Candidate Skills: {skills_str}
 Candidate Project: {project}
 Difficulty: {difficulty}
-{role_line}
+{role_line}{_avoid_block(asked_questions)}
 Rules — follow every rule strictly:
+- Ask about an aspect of the project that has NOT already been covered above.
 - Ask ONLY one question. Never two.
 - Connect the question directly to the project "{project}".
 - Focus on HOW the candidate built it, what challenges they faced, or implementation decisions made.
@@ -150,6 +179,7 @@ def generate_technical_question(
     difficulty: str = "medium",
     role: Optional[str] = None,
     language: Optional[str] = None,
+    asked_questions: Optional[List[str]] = None,
 ) -> str:
     """
     Generate a technical interview question.
@@ -180,6 +210,8 @@ def generate_technical_question(
         projects = []
     if used_skills is None:
         used_skills = []
+    if asked_questions is None:
+        asked_questions = []
 
     # Safety fallback for completely empty input
     if not skills and not projects:
@@ -193,20 +225,30 @@ def generate_technical_question(
 
     # ── Day 4: Context-aware question (project + skills) ──────────────────
     if projects:
-        project = random.choice(projects)
+        # Prefer a project no question has mentioned yet. random.choice over
+        # every project meant the same one came up repeatedly -- observed as
+        # two consecutive questions about the same deployment setup, then two
+        # more about the same batch job. used_skills filtered skills but
+        # nothing filtered projects, which is what the context prompt is
+        # actually built around.
+        asked_blob = " ".join(asked_questions).lower()
+        unasked = [pr for pr in projects if pr.lower() not in asked_blob]
+        project = random.choice(unasked if unasked else projects)
         logger.info(
             "Technical Agent (context-aware) — project: '%s', skills: %s, fresh: %s",
             project,
             skills,
             available_skills,
         )
-        prompt = _build_context_prompt(available_skills, project, difficulty, role, language)
+        prompt = _build_context_prompt(
+            available_skills, project, difficulty, role, language, asked_questions
+        )
 
     # ── Day 3: Skill-only question ─────────────────────────────────────────
     else:
         skill = random.choice(available_skills)
         logger.info("Technical Agent (skill-based) — skill: '%s'", skill)
-        prompt = _build_skill_prompt(skill, difficulty, role, language)
+        prompt = _build_skill_prompt(skill, difficulty, role, language, asked_questions)
 
     raw_response = call_llm(prompt, purpose="question")
 

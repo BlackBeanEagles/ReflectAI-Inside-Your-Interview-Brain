@@ -100,6 +100,7 @@ type PersistedSession = {
   scoreHistory: number[];
   stressCount: number;
   usedSkills: string[];
+  askedQuestions: string[];
   currentQuestion: string | null;
   storedCount: number;
   role: string;
@@ -153,6 +154,10 @@ function InterviewSessionInner() {
   const [scoreHistory, setScoreHistory] = useState<number[]>([]);
   const [stressCount, setStressCount] = useState(0);
   const [usedSkills, setUsedSkills] = useState<string[]>([]);
+  // Every question asked so far, verbatim. used_skills only steers which
+  // skill gets picked; without the questions themselves the generator
+  // re-asks the same thing about the same project in different words.
+  const [askedQuestions, setAskedQuestions] = useState<string[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<string | null>(null);
   const [transitionMessage, setTransitionMessage] = useState<string | null>(null);
   const [interviewComplete, setInterviewComplete] = useState(false);
@@ -291,6 +296,7 @@ function InterviewSessionInner() {
         setScoreHistory(saved.scoreHistory ?? []);
         setStressCount(saved.stressCount ?? 0);
         setUsedSkills(saved.usedSkills ?? []);
+        setAskedQuestions(saved.askedQuestions ?? []);
         setCurrentQuestion(saved.currentQuestion);
         setStoredCount(saved.storedCount ?? 0);
         setRole(saved.role ?? "None");
@@ -329,6 +335,7 @@ function InterviewSessionInner() {
       scoreHistory,
       stressCount,
       usedSkills,
+      askedQuestions,
       currentQuestion,
       storedCount,
       role,
@@ -343,7 +350,7 @@ function InterviewSessionInner() {
     }
   }, [
     phase, sessionId, cleaned, count, round, difficulty, scoreHistory, stressCount,
-    usedSkills, currentQuestion, storedCount, role, language, interviewComplete,
+    usedSkills, askedQuestions, currentQuestion, storedCount, role, language, interviewComplete,
     completionNotice,
   ]);
 
@@ -379,6 +386,7 @@ function InterviewSessionInner() {
           projects: activeCleaned.projects,
           experience: activeCleaned.experience,
           used_skills: opts.used,
+          asked_questions: askedQuestions,
           current_round: opts.round,
           score_history: opts.scoreHist,
           difficulty: opts.difficulty,
@@ -427,6 +435,7 @@ function InterviewSessionInner() {
       }
 
       setCurrentQuestion(result.question);
+      setAskedQuestions((prev) => [...prev, result.question]);
       setRound(result.round);
       setCount(result.count);
       setDifficulty(result.difficulty);
@@ -515,6 +524,20 @@ function InterviewSessionInner() {
 
       const responseTime = questionStartedAt ? (Date.now() - questionStartedAt) / 1000 : undefined;
       if (!result.error) {
+        // The score goes into local history FIRST, outside the persistence
+        // call. It used to sit inside the try below, after the await -- so
+        // whenever saving failed (and that catch is deliberately silent),
+        // the score was silently dropped.
+        //
+        // That is not a cosmetic loss: score_history is what the backend's
+        // decide_next_step reads to compute avg_score, and avg_score is the
+        // sole trigger for the stress round. A dropped history meant
+        // avg_score stayed None and the stress round could never fire no
+        // matter how the candidate actually performed -- the interview
+        // silently stopped adapting. Interview logic must not depend on a
+        // best-effort storage call.
+        setScoreHistory((h) => [...h, result.final_score]);
+
         try {
           await api.addInteraction({
             session_id: sessionId,
@@ -527,8 +550,11 @@ function InterviewSessionInner() {
             response_time_seconds: responseTime,
             voice_analysis: voiceAnalysis || undefined,
           });
+          // storedCount is only ever the count of answers actually SAVED --
+          // it labels "N answers saved to this session", so it stays tied to
+          // the call succeeding. UI that means "has answered anything" gates
+          // on scoreHistory.length instead.
           setStoredCount((c) => c + 1);
-          setScoreHistory((h) => [...h, result.final_score]);
         } catch {
           // Best-effort, same as the Streamlit app -- don't block the user
           // if session storage fails.
@@ -612,6 +638,7 @@ function InterviewSessionInner() {
     setScoreHistory([]);
     setStressCount(0);
     setUsedSkills([]);
+    setAskedQuestions([]);
     setCurrentQuestion(null);
     setTransitionMessage(null);
     setInterviewComplete(false);
@@ -681,7 +708,7 @@ function InterviewSessionInner() {
                   point, so refusing to hand over the report until all ten
                   questions are done was withholding something already paid
                   for. Reset was the only other exit, and it destroys them. */}
-              {storedCount > 0 && !interviewComplete && (
+              {scoreHistory.length > 0 && !interviewComplete && (
                 <SecondaryButton onClick={() => setConfirmFinish(true)} disabled={reportLoading}>
                   {reportLoading ? "Generating…" : "Finish early"}
                 </SecondaryButton>
@@ -706,7 +733,7 @@ function InterviewSessionInner() {
               <p className="text-sm">
                 <b>Finish now?</b>{" "}
                 <span className="text-ri-text-mute">
-                  {`You've answered ${storedCount} of ${MAX_QUESTIONS} — your report will be built from just those.`}
+                  {`You've answered ${scoreHistory.length} of ${MAX_QUESTIONS} — your report will be built from just those.`}
                 </span>
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -725,8 +752,8 @@ function InterviewSessionInner() {
               <p className="text-sm">
                 <b>Discard this interview?</b>{" "}
                 <span className="text-ri-text-mute">
-                  {storedCount > 0
-                    ? `${storedCount} answered question${storedCount !== 1 ? "s" : ""} and their scores will be deleted. This can't be undone.`
+                  {scoreHistory.length > 0
+                    ? `${scoreHistory.length} answered question${scoreHistory.length !== 1 ? "s" : ""} and their scores will be deleted. This can't be undone.`
                     : "You'll go back to the setup screen and start over."}
                 </span>
               </p>
@@ -735,7 +762,7 @@ function InterviewSessionInner() {
                   Discard and start over
                 </SecondaryButton>
                 <SecondaryButton onClick={() => setConfirmReset(false)}>Keep going</SecondaryButton>
-                {storedCount > 0 && (
+                {scoreHistory.length > 0 && (
                   <PrimaryButton onClick={handleGenerateReport} disabled={reportLoading}>
                     {reportLoading ? "Generating…" : "Finish and get my report"}
                   </PrimaryButton>
@@ -782,9 +809,9 @@ function InterviewSessionInner() {
               <PrimaryButton onClick={retryLastQuestion} disabled={nextLoading}>
                 {nextLoading ? "Retrying…" : "Try again"}
               </PrimaryButton>
-              {storedCount > 0 && (
+              {scoreHistory.length > 0 && (
                 <SecondaryButton onClick={handleGenerateReport} disabled={reportLoading}>
-                  {reportLoading ? "Generating…" : `Finish with ${storedCount} answered`}
+                  {reportLoading ? "Generating…" : `Finish with ${scoreHistory.length} answered`}
                 </SecondaryButton>
               )}
             </div>

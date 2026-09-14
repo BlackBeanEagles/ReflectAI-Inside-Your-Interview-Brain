@@ -173,6 +173,7 @@ export interface NextQuestionPayload {
   projects: string[];
   experience: string[];
   used_skills: string[];
+  asked_questions?: string[];
   current_round: string;
   score_history: number[];
   difficulty: string;

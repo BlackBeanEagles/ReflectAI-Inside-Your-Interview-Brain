@@ -289,6 +289,27 @@ def _dispatch(prompt: str, purpose: str, timeout: int) -> Dict:
 
 # ─── Main entry point ─────────────────────────────────────────────────────────
 
+# Purposes whose output is prose a real person reads about themselves.
+# Anything here gets NEUTRAL_PERSON_RULE appended to its prompt.
+NARRATIVE_PURPOSES = frozenset({"coach", "report", "evaluation"})
+
+# No user of this product ever states a gender, and none of the signals fed
+# to the model carry one -- the input is a résumé, some answers and a set of
+# scores. Left unconstrained, models pick a pronoun anyway, and observed
+# output referred to the candidate as "she" throughout. That is a coin-flip
+# guess about a real person, printed in a document about their own
+# performance, which is worse than merely sloppy.
+#
+# Applied in call_llm rather than in each prompt because there are five call
+# sites producing candidate-facing prose across four modules, and a rule
+# living in one of them would not survive the sixth being added.
+NEUTRAL_PERSON_RULE = (
+    "\n\nWrite about the person as \"the candidate\" or \"you\". Never use "
+    "he, she, him, her, his, or hers -- their gender is unknown and must not "
+    "be guessed. Use \"they\" if a pronoun is unavoidable."
+)
+
+
 def call_llm(
     prompt: str,
     purpose: str = "default",
@@ -307,6 +328,9 @@ def call_llm(
         timeout:   Seconds before giving up.
         use_cache: Memoise identical prompts for cacheable purposes.
     """
+    if purpose in NARRATIVE_PURPOSES:
+        prompt = prompt + NEUTRAL_PERSON_RULE
+
     key = (PROVIDER, MODEL, purpose, prompt)
 
     if use_cache and purpose in CACHEABLE:

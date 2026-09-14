@@ -196,6 +196,9 @@ class NextQuestionRequest(BaseModel):
     projects:     Cleaned project names from the parsed resume.
     experience:   Cleaned experience entries from the parsed resume.
     used_skills:  Skills already asked about — used to prevent repetition.
+    asked_questions: The questions already asked, verbatim. used_skills only
+                  controls which skill is picked; without the questions
+                  themselves the model re-asks the same thing reworded.
     current_round: Current flow state: hr, technical, stress, or end.
     score_history: Evaluated final scores used by adaptive difficulty.
     difficulty:    Current adaptive difficulty.
@@ -208,6 +211,7 @@ class NextQuestionRequest(BaseModel):
     projects: List[str] = []
     experience: List[str] = []
     used_skills: List[str] = []
+    asked_questions: List[str] = []
     current_round: str = "hr"
     score_history: List[float] = []
     difficulty: str = "medium"
