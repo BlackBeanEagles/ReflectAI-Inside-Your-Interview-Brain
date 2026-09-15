@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { ResumeProvider } from "@/lib/resume-context";
+import CommandPalette from "@/components/CommandPalette";
 import Nav from "@/components/Nav";
 import ServiceWorker from "@/components/ServiceWorker";
 import { Grain } from "@/components/Ambience";
@@ -67,12 +68,29 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
+      <head>
+        {/* Applies a saved dark theme before first paint. The palette's own
+            restore runs after hydration, which is one full render too late:
+            a user who chose dark would get a white flash on every load.
+            Deliberately reads only the stored choice and never
+            prefers-color-scheme -- dark is opt-in here, not inherited from
+            the OS. Wrapped in try/catch because localStorage throws rather
+            than returning null in a private window. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('reflectinterview_theme');" +
+              "if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}",
+          }}
+        />
+      </head>
       <body className="flex min-h-full flex-col">
         <Grain />
         <ServiceWorker />
         <AuthProvider>
           <ResumeProvider>
             <Nav />
+            <CommandPalette />
             <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6">{children}</main>
             <footer className="mt-8 border-t border-ri-border py-6 text-center text-xs text-ri-text-mute">
               Adaptive multi-round interview and session report

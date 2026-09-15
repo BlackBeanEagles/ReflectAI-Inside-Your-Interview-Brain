@@ -195,6 +195,28 @@ def _create_schema(conn) -> None:
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_password_resets_token_hash ON password_resets(token_hash)")
 
+    # Per-answer verdicts on the scoring itself ("was this score fair?").
+    # Deliberately NOT a column on interactions: the rating arrives after
+    # that row is written, often from a session that never persisted an
+    # interaction at all (storage consent is opt-in), and a rating with no
+    # matching interaction row is still worth having. The question text is
+    # stored alongside so a verdict can be read without a join that may
+    # have nothing to join to.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS answer_feedback (
+            id SERIAL PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            question TEXT,
+            round_type TEXT,
+            final_score REAL,
+            verdict TEXT NOT NULL,
+            note TEXT,
+            created_at TIMESTAMPTZ DEFAULT now()
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_answer_feedback_session ON answer_feedback(session_id)")
+
 
 def save_resume(session_id: str, raw_text: Optional[str], cleaned: Dict, user_id: Optional[int] = None) -> None:
     """Persist a parsed resume tied to a session_id (and a user, if logged in). Best-effort."""
@@ -250,6 +272,33 @@ def save_interaction(session_id: str, interaction: Dict, user_id: Optional[int] 
             )
     except Exception:
         logger.exception("db: save_interaction failed for session %s", session_id)
+
+
+def save_answer_feedback(
+    session_id: str,
+    question: Optional[str],
+    round_type: Optional[str],
+    final_score: Optional[float],
+    verdict: str,
+    note: Optional[str] = None,
+    user_id: Optional[int] = None,
+) -> None:
+    """Persist one 'was this score fair?' verdict. Best-effort, like the rest."""
+    pool = _get_pool()
+    if pool is None:
+        return
+    try:
+        with pool.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO answer_feedback
+                    (session_id, user_id, question, round_type, final_score, verdict, note)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (session_id, user_id, question, round_type, final_score, verdict, note),
+            )
+    except Exception:
+        logger.exception("db: save_answer_feedback failed for session %s", session_id)
 
 
 def save_report(session_id: str, report: Dict, user_id: Optional[int] = None) -> None:
@@ -441,7 +490,7 @@ def delete_user_account(user_id: int) -> Dict[str, int]:
 
     counts: Dict[str, int] = {}
     with pool.connection() as conn:
-        for table in ("interactions", "resumes", "reports", "password_resets"):
+        for table in ("interactions", "resumes", "reports", "answer_feedback", "password_resets"):
             cur = conn.execute(f"DELETE FROM {table} WHERE user_id = %s", (user_id,))
             counts[table] = max(cur.rowcount, 0)
         cur = conn.execute("DELETE FROM users WHERE id = %s", (user_id,))

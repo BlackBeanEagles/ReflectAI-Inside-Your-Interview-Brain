@@ -453,6 +453,34 @@ body {
 
 /* One focus treatment for every interactive element, so keyboard users
    get a single consistent affordance instead of per-component guesses. */
+/* Small pill button used by the "was this score fair?" row. Quiet by
+   default -- it sits under the scores and must not compete with "Next
+   question" -- and only picks up the accent on hover. */
+.ri-verdict-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--ri-border);
+  border-radius: 999px;
+  background: var(--ri-surface);
+  color: var(--ri-text-mute);
+  font-size: 0.75rem;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: color var(--ri-motion) ease, border-color var(--ri-motion) ease,
+    background-color var(--ri-motion) ease;
+}
+.ri-verdict-chip:hover {
+  color: var(--ri-accent);
+  border-color: var(--ri-accent);
+  background: color-mix(in srgb, var(--ri-accent) 7%, var(--ri-surface));
+}
+.ri-verdict-chip:focus-visible {
+  outline: 2px solid var(--ri-accent);
+  outline-offset: 2px;
+}
+
 .ri-focus:focus-visible {
   outline: 2px solid var(--ri-accent);
   outline-offset: 2px;

@@ -33,6 +33,8 @@ import {
   RotateCcw,
   Sparkles,
   Square,
+  ThumbsDown,
+  ThumbsUp,
   TriangleAlert,
   Volume2,
 } from "lucide-react";
@@ -992,6 +994,15 @@ function InterviewSessionInner() {
                       <ScorePanel key={dim} label={dim} score={val} />
                     ))}
                   </div>
+                  <ScoreVerdict
+                    key={currentQuestion}
+                    sessionId={sessionId}
+                    question={currentQuestion}
+                    round={round}
+                    score={evalResult.final_score}
+                    token={token}
+                  />
+
                   <PrimaryButton onClick={handleNext} disabled={nextLoading}>
                     {nextLoading ? "Loading next question…" : "Next question"}
                     <ArrowRight size={15} strokeWidth={1.75} aria-hidden />
@@ -1118,6 +1129,108 @@ function FeedbackLine({
         </dt>
         <dd className="mt-0.5 text-sm leading-relaxed text-ri-text-mute">{children}</dd>
       </div>
+    </div>
+  );
+}
+
+/** "Was this score fair?" -- one question, asked once per answer.
+ *
+ *  The scores come out of a language model and are sometimes wrong in ways
+ *  only the person who wrote the answer can see. Without somewhere to say
+ *  so, a bad score is just a thing the user quietly stops believing, and
+ *  nothing about it reaches anyone who could fix it.
+ *
+ *  It is placed under the scores rather than above them -- it is a reaction
+ *  to a number, so it cannot come first -- and it never blocks: the thanks
+ *  render on click, before the request settles, and a failed request is
+ *  swallowed. Losing a rating is not worth interrupting an interview for.
+ *
+ *  "Unfair" opens an optional one-line box, because why it was unfair is
+ *  the only part of this signal anyone can act on. */
+function ScoreVerdict({
+  sessionId,
+  question,
+  round,
+  score,
+  token,
+}: {
+  sessionId: string | null;
+  question: string | null;
+  round: string;
+  score: number;
+  token: string | null;
+}) {
+  const [verdict, setVerdict] = useState<"fair" | "unfair" | null>(null);
+  const [note, setNote] = useState("");
+  const [noteSent, setNoteSent] = useState(false);
+
+  function send(v: "fair" | "unfair", withNote?: string) {
+    if (!sessionId) return;
+    setVerdict(v);
+    api
+      .sendAnswerFeedback(
+        {
+          session_id: sessionId,
+          verdict: v,
+          question: question ?? undefined,
+          round_type: round,
+          final_score: score,
+          note: withNote?.trim() || undefined,
+        },
+        token,
+      )
+      .catch(() => {
+        /* Best-effort. A rating is not worth an error banner mid-interview. */
+      });
+  }
+
+  if (verdict === null) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 text-xs text-ri-text-mute">
+        <span>Was this score fair?</span>
+        <button
+          type="button"
+          onClick={() => send("fair")}
+          className="ri-verdict-chip"
+        >
+          <ThumbsUp size={13} strokeWidth={1.75} aria-hidden /> Fair
+        </button>
+        <button
+          type="button"
+          onClick={() => send("unfair")}
+          className="ri-verdict-chip"
+        >
+          <ThumbsDown size={13} strokeWidth={1.75} aria-hidden /> Off the mark
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 text-xs text-ri-text-mute" aria-live="polite">
+      <p>Thanks — noted.</p>
+      {verdict === "unfair" && !noteSent && (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            type="text"
+            value={note}
+            maxLength={500}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="What did it miss? (optional)"
+            className="ri-focus flex-1 rounded-[var(--ri-radius-control)] border border-ri-border bg-ri-surface px-2.5 py-1.5 text-xs text-ri-text outline-none"
+          />
+          <button
+            type="button"
+            className="ri-verdict-chip shrink-0"
+            onClick={() => {
+              if (note.trim()) send("unfair", note);
+              setNoteSent(true);
+            }}
+          >
+            Send
+          </button>
+        </div>
+      )}
     </div>
   );
 }

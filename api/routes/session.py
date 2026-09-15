@@ -28,6 +28,8 @@ from models.schemas import (
     SessionStartRequest,
     SessionStartResponse,
     AddInteractionRequest,
+    AnswerFeedbackRequest,
+    AnswerFeedbackResponse,
     SessionHistoryResponse,
     InteractionItem,
     ReportResponse,
@@ -133,6 +135,47 @@ def add_interaction(request: AddInteractionRequest):
         "count":   count,
         "interaction": interaction,
     }
+
+
+# ─── POST /session/answer-feedback ───────────────────────────────────────────
+
+@router.post("/answer-feedback", response_model=AnswerFeedbackResponse)
+def answer_feedback(request: AnswerFeedbackRequest, current=Depends(get_optional_user)):
+    """
+    Record whether the user thought one score was fair.
+
+    The scores come out of an LLM and are sometimes wrong in ways only the
+    person who wrote the answer can see. Without a way to say so, a bad
+    score is just something the user silently stops trusting, and nothing
+    about it ever reaches us.
+
+    Stored only when the session opted into persistent storage, the same
+    gate /session/add-interaction uses -- a rating is still content about
+    the user's own answer, so it does not get a weaker rule than the answer
+    itself. Without consent the call succeeds with stored=False rather than
+    failing: the UI has already thanked the user, and an error there would
+    be a confusing way to say "your privacy choice was honoured".
+    """
+    _check_session_access(request.session_id, current)
+
+    stored = False
+    if session_manager.has_store_consent(request.session_id):
+        db.save_answer_feedback(
+            session_id=request.session_id,
+            question=request.question,
+            round_type=request.round_type,
+            final_score=request.final_score,
+            verdict=request.verdict,
+            note=request.note,
+            user_id=session_manager.get_session_user_id(request.session_id),
+        )
+        stored = True
+
+    logger.info(
+        "session: answer-feedback %s for %s (score=%s, stored=%s)",
+        request.verdict, request.session_id, request.final_score, stored,
+    )
+    return AnswerFeedbackResponse(success=True, stored=stored, message="Thanks — noted.")
 
 
 # ─── GET /session/{session_id} ────────────────────────────────────────────────

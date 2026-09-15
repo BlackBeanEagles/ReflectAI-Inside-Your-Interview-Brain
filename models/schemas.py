@@ -17,7 +17,7 @@ Schemas:
     ReportResponse                             — Week 3 Day 6 final report output
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -120,6 +120,25 @@ class PredictQuestionsResponse(BaseModel):
     # smaller number than the slider the user just set.
     requested: int = 0
     error: bool = False
+    message: str = ""
+
+
+class AnswerFeedbackRequest(BaseModel):
+    """Input schema for /session/answer-feedback -- one verdict on one score."""
+    session_id: str
+    verdict: Literal["fair", "unfair"]
+    question: Optional[str] = None
+    round_type: Optional[str] = None
+    final_score: Optional[float] = None
+    # Free text is optional and capped. It exists so "unfair" can say why,
+    # which is the only part of this signal that is actually actionable.
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+class AnswerFeedbackResponse(BaseModel):
+    """Output schema for /session/answer-feedback."""
+    success: bool = True
+    stored: bool = False
     message: str = ""
 
 

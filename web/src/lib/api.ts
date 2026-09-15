@@ -138,6 +138,24 @@ export function addInteraction(payload: AddInteractionPayload): Promise<unknown>
   return request("/session/add-interaction", jsonInit(payload));
 }
 
+export interface AnswerFeedbackPayload {
+  session_id: string;
+  verdict: "fair" | "unfair";
+  question?: string;
+  round_type?: string;
+  final_score?: number;
+  note?: string;
+}
+
+/** Record whether the user thought one score was fair. Best-effort: the UI
+ *  acknowledges immediately and never blocks the interview on this. */
+export function sendAnswerFeedback(
+  payload: AnswerFeedbackPayload,
+  token?: string | null,
+): Promise<{ success: boolean; stored: boolean; message: string }> {
+  return request("/session/answer-feedback", jsonInit(payload), token);
+}
+
 export function generateReport(
   sessionId: string,
   token?: string | null,

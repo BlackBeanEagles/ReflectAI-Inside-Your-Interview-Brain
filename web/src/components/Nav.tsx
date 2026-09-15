@@ -2,21 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, FileText, ListChecks, MessagesSquare, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useHealth } from "@/lib/hooks";
-
-// Real icons rather than emoji. Emoji render as a different typeface on every
-// platform, can't inherit colour or stroke weight, and sit on their own
-// baseline -- so a row of them never optically aligns with the labels beside
-// them. lucide-react was already a dependency and previously went unused.
-const NAV_ITEMS = [
-  { href: "/", label: "Interview", icon: MessagesSquare },
-  { href: "/resume", label: "Resume", icon: FileText },
-  { href: "/ats", label: "ATS Score", icon: ListChecks },
-  { href: "/predict", label: "Questions", icon: Sparkles },
-  { href: "/history", label: "History", icon: BarChart3 },
-];
+import { NAV_ITEMS } from "@/lib/nav-items";
 
 function StatusDot() {
   const { health, checked } = useHealth();
