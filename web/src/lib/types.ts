@@ -201,6 +201,8 @@ export interface PredictedQuestionItem {
 
 export interface PredictQuestionsResponse {
   questions: PredictedQuestionItem[];
+  /** How many were asked for. Often above questions.length -- see the note on the schema. */
+  requested: number;
   error: boolean;
   message: string;
 }

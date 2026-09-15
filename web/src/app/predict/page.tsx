@@ -7,10 +7,10 @@ import { Alert, Card, PrimaryButton, TextArea, TextField } from "@/components/ui
 import { ResumePicker } from "@/components/ResumePicker";
 import type { PredictedQuestionItem } from "@/lib/types";
 
-const CATEGORY_META: Record<string, { icon: string; label: string }> = {
-  technical: { icon: "", label: "Technical" },
-  hr: { icon: "", label: "HR" },
-  behavioral: { icon: "", label: "Behavioral" },
+const CATEGORY_LABEL: Record<string, string> = {
+  technical: "Technical",
+  hr: "HR",
+  behavioral: "Behavioral",
 };
 
 export default function PredictedQuestionsPage() {
@@ -22,6 +22,7 @@ export default function PredictedQuestionsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [count, setCount] = useState(10);
   const [questions, setQuestions] = useState<PredictedQuestionItem[] | null>(null);
+  const [requested, setRequested] = useState(10);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nextPredictSignal = useAbortSignal();
@@ -51,6 +52,7 @@ export default function PredictedQuestionsPage() {
         setError(result.message || "Could not generate questions right now.");
       } else {
         setQuestions(result.questions);
+        setRequested(result.requested || count);
       }
     } catch (err) {
       if (isAbortError(err)) return;
@@ -128,13 +130,20 @@ export default function PredictedQuestionsPage() {
       {questions && (
         <Card className="ri-enter">
           <p className="text-sm text-ri-text-mute mb-4">
-            {questions.length} question(s) generated — grouped by category.
+            {questions.length === 1 ? "1 question" : `${questions.length} questions`} generated,
+            grouped by category.
+            {questions.length < requested && (
+              <>
+                {" "}You asked for {requested}; near-duplicates were merged. Generating again
+                usually produces a different set.
+              </>
+            )}
           </p>
           <div className="space-y-5">
             {grouped.map(({ cat, items }) => (
               <div key={cat}>
                 <h3 className="font-bold text-sm mb-2">
-                  {CATEGORY_META[cat].icon} {CATEGORY_META[cat].label}
+                  {CATEGORY_LABEL[cat]}
                 </h3>
                 <ul className="space-y-2">
                   {items.map((q, i) => (

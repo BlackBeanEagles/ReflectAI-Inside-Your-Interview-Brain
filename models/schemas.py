@@ -114,6 +114,11 @@ class PredictedQuestionItem(BaseModel):
 class PredictQuestionsResponse(BaseModel):
     """Output schema for /predict-questions."""
     questions: List[PredictedQuestionItem]
+    # What the user actually asked for. The generator drops duplicate and
+    # malformed lines, so len(questions) is regularly below this -- the UI
+    # needs both numbers to explain the gap instead of quietly showing a
+    # smaller number than the slider the user just set.
+    requested: int = 0
     error: bool = False
     message: str = ""
 

@@ -179,6 +179,7 @@ def predict_questions(
     if not skills and not projects and not role and not job_description:
         return {
             "questions": [],
+            "requested": count,
             "error": True,
             "message": "Add a resume, a target role, or a job description first.",
         }
@@ -188,7 +189,7 @@ def predict_questions(
 
     if raw.startswith(LLM_ERROR_PREFIXES):
         logger.error("question_predictor: LLM error: %s", raw)
-        return {"questions": [], "error": True, "message": raw}
+        return {"questions": [], "requested": count, "error": True, "message": raw}
 
     questions = _parse_predictions(raw, count)
     if not questions:
@@ -198,9 +199,10 @@ def predict_questions(
         )
         return {
             "questions": [],
+            "requested": count,
             "error": True,
             "message": "Could not generate questions right now. Try again.",
         }
 
     logger.info("question_predictor: generated %d/%d requested questions", len(questions), count)
-    return {"questions": questions, "error": False, "message": ""}
+    return {"questions": questions, "requested": count, "error": False, "message": ""}
