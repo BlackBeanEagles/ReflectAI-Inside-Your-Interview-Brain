@@ -25,16 +25,12 @@ export const SAMPLE_RESUMES: SampleResume[] = [
     text: `Skills: Python, FastAPI, PostgreSQL, Redis, Docker, AWS
 
 Projects:
-Real-time inventory tracking service — FastAPI + websockets pushing stock
-changes to warehouse clients. Postgres primary with a Redis cache in front.
-Deployed on ECS behind an ALB.
+Real-time inventory tracking service — FastAPI + websockets pushing stock changes to warehouse clients. Postgres primary with a Redis cache in front. Deployed on ECS behind an ALB.
 
-Internal reporting API — nightly aggregation jobs feeding a dashboard used by
-the ops team.
+Internal reporting API — nightly aggregation jobs feeding a dashboard used by the ops team.
 
 Experience:
-2 years backend engineering at a logistics startup. Owned the inventory
-service end to end, took part in on-call rotation, mentored one intern.`,
+2 years backend engineering at a logistics startup. Owned the inventory service end to end, took part in on-call rotation, mentored one intern.`,
   },
   {
     id: "frontend",
@@ -43,15 +39,12 @@ service end to end, took part in on-call rotation, mentored one intern.`,
     text: `Skills: TypeScript, React, Next.js, Tailwind CSS, Playwright, Figma
 
 Projects:
-Customer billing portal — Next.js app for viewing invoices and updating payment
-methods. Built the design system components used across three internal apps.
+Customer billing portal — Next.js app for viewing invoices and updating payment methods. Built the design system components used across three internal apps.
 
-Accessibility pass — audited the main product surface and fixed keyboard traps
-and missing labels flagged by an external review.
+Accessibility pass — audited the main product surface and fixed keyboard traps and missing labels flagged by an external review.
 
 Experience:
-3 years frontend at a B2B SaaS company. Led the migration from a legacy SPA to
-the App Router, worked closely with design on the component library.`,
+3 years frontend at a B2B SaaS company. Led the migration from a legacy SPA to the App Router, worked closely with design on the component library.`,
   },
   {
     id: "newgrad",
@@ -60,15 +53,11 @@ the App Router, worked closely with design on the component library.`,
     text: `Skills: Java, Python, SQL, Git, basic Docker
 
 Projects:
-Campus event finder — Android app that pulls university event feeds and lets
-students filter by department. Final year project, worked in a team of four.
+Campus event finder — Android app that pulls university event feeds and lets students filter by department. Final year project, worked in a team of four.
 
-Movie recommender — collaborative filtering on the MovieLens dataset for a
-machine learning coursework module.
+Movie recommender — collaborative filtering on the MovieLens dataset for a machine learning coursework module.
 
 Experience:
-Six-month software engineering internship at a fintech company: wrote unit
-tests for an existing payments module, fixed logged bugs, shadowed code review.
-BSc Computer Science, graduated this year.`,
+Six-month software engineering internship at a fintech company: wrote unit tests for an existing payments module, fixed logged bugs, shadowed code review. BSc Computer Science, graduated this year.`,
   },
 ];

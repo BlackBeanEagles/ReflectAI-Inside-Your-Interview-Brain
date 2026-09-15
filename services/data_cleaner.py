@@ -241,14 +241,39 @@ def clean_skills(raw_skills: List[str]) -> List[str]:
     return _deduplicate(filtered)
 
 
+def _smart_title(text: str) -> str:
+    """
+    Title-case only the words that need it.
+
+    str.title() destroys every acronym it touches: FastAPI becomes Fastapi,
+    ECS becomes Ecs, ALB becomes Alb, API becomes Api. That is visible
+    corruption of the user's own résumé text, and the correct casing is
+    right there in the input -- the Skills column renders it properly from
+    the same payload because it never calls .title().
+
+    A word that already contains an uppercase letter was capitalised
+    deliberately by whoever wrote the résumé, so it is left exactly alone.
+    Only all-lowercase words get capitalised.
+    """
+    def fix(word: str) -> str:
+        if not word:
+            return word
+        if any(ch.isupper() for ch in word):
+            return word          # FastAPI, ECS, PostgreSQL, iOS, GraphQL...
+        return word[:1].upper() + word[1:]
+
+    return " ".join(fix(w) for w in text.split(" "))
+
+
 def clean_projects(raw_projects: List[str]) -> List[str]:
     """
     Clean project names:
       1. Strip whitespace
-      2. Title-case
+      2. Capitalise only all-lowercase words (see _smart_title -- plain
+         .title() mangles FastAPI, ECS, ALB and every other acronym)
       3. Deduplicate (case-insensitive)
     """
-    normalized = [p.strip().title() for p in raw_projects if p.strip()]
+    normalized = [_smart_title(p.strip()) for p in raw_projects if p.strip()]
     return _deduplicate(normalized)
 
 

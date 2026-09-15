@@ -134,9 +134,27 @@ def test_clean_skills_empty_list_returns_empty_list():
     assert clean_skills([]) == []
 
 
-def test_clean_projects_title_cases_and_dedupes():
-    result = clean_projects(["e-commerce site", "E-Commerce Site", "chatbot"])
-    assert result == ["E-Commerce Site", "Chatbot"]
+def test_clean_projects_capitalises_lowercase_words_and_dedupes():
+    # Deliberate behaviour change: capitalisation the writer already applied is
+    # preserved, and only all-lowercase words get capitalised.
+    #
+    # This previously used str.title(), which rewrote every acronym in the
+    # user's own resume -- FastAPI became Fastapi, ECS became Ecs, ALB became
+    # Alb -- while the Skills column rendered them correctly from the same
+    # payload. "e-commerce" now capitalises to "E-commerce" (the conventional
+    # spelling) rather than "E-Commerce".
+    result = clean_projects(["e-commerce site", "E-commerce Site", "chatbot"])
+    assert result == ["E-commerce Site", "Chatbot"]
+
+
+def test_clean_projects_never_mangles_acronyms():
+    result = clean_projects(["FastAPI service on ECS behind an ALB", "graphql api"])
+    # Acronyms the writer capitalised survive untouched; all-lowercase words
+    # are capitalised as before. This is not full English title case -- small
+    # words are capitalised too -- but that is pre-existing behaviour, and the
+    # bug being fixed here is the acronym mangling, not the preposition.
+    assert result == ["FastAPI Service On ECS Behind An ALB", "Graphql Api"]
+    assert "Fastapi" not in result[0] and "Ecs" not in result[0] and "Alb" not in result[0]
 
 
 def test_clean_experience_normalizes_known_labels():
