@@ -61,75 +61,21 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      # TEMPORARY diagnostics. Logs and summaries need a sign-in even on a
-      # public repo; step conclusions are public. continue-on-error is NOT
-      # used -- it rewrites a failed step's conclusion to success, which
-      # made the previous attempt report success for every check. Instead
-      # these run fail-fast: the job stops at the first false assertion, so
-      # the first failing step IS the answer and everything after it shows
-      # as skipped. Removed once answered.
-      - name: "diag: capture npm ci output"
-        run: npm ci > /tmp/out.log 2>&1 || true
-
-      - name: "assert: cwd is web"
-        run: test "$(basename "$PWD")" = "web"
-
-      - name: "assert: lockfile present"
-        run: test -f package-lock.json
-
-      - name: "assert: log is non-empty"
-        run: test -s /tmp/out.log
-
-      - name: "assert: not ebadplatform"
-        run: "! grep -qi 'EBADPLATFORM' /tmp/out.log"
-
-      - name: "assert: not eusage"
-        run: "! grep -qi 'EUSAGE' /tmp/out.log"
-
-      - name: "assert: not enotempty"
-        run: "! grep -qi 'ENOTEMPTY' /tmp/out.log"
-
-      - name: "assert: not ebadengine"
-        run: "! grep -qi 'EBADENGINE' /tmp/out.log"
-
-      - name: "assert: not eresolve"
-        run: "! grep -qi 'ERESOLVE' /tmp/out.log"
-
-      - name: "assert: not e404"
-        run: "! grep -qi 'E404' /tmp/out.log"
-
-      - name: "assert: not eacces"
-        run: "! grep -qi 'EACCES' /tmp/out.log"
-
-      - name: "assert: not eintegrity"
-        run: "! grep -qi 'EINTEGRITY' /tmp/out.log"
-
-      - name: "assert: not enospc"
-        run: "! grep -qi 'ENOSPC' /tmp/out.log"
-
-      - name: "assert: not exit-handler-never-called"
-        run: "! grep -qi 'Exit handler never called' /tmp/out.log"
-
-      - name: "assert: not cannot-read"
-        run: "! grep -qi 'Cannot read' /tmp/out.log"
-
-      - name: "assert: not maximum-call-stack"
-        run: "! grep -qi 'Maximum call stack' /tmp/out.log"
-
-      - name: "assert: not sharp"
-        run: "! grep -qi 'sharp' /tmp/out.log"
-
-      - name: "assert: not lightningcss"
-        run: "! grep -qi 'lightningcss' /tmp/out.log"
-
-      - name: "assert: not oxide"
-        run: "! grep -qi 'oxide' /tmp/out.log"
-
-      - name: "assert: not postinstall"
-        run: "! grep -qi 'postinstall' /tmp/out.log"
-
-      - name: Install dependencies
-        run: npm ci
+      # TEMPORARY diagnostic. Logs and run summaries both need a sign-in
+      # even on a public repo, but check ANNOTATIONS are public and a
+      # ::error:: workflow command creates one -- so npm's own message is
+      # emitted that way. paste joins the lines with a tilde because a
+      # workflow command is single-line. Removed once answered.
+      - name: "diag: report npm ci failure as an annotation"
+        run: |
+          set +e
+          npm ci > /tmp/out.log 2>&1
+          code=$?
+          if [ "$code" -ne 0 ]; then
+            msg=$(head -c 1200 /tmp/out.log | paste -sd '~' -)
+            echo "::error title=npm ci failed::${msg}"
+            exit 1
+          fi
 
       - name: Typecheck
         run: npx tsc --noEmit
