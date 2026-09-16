@@ -73,6 +73,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # next typegen must run before tsc. The App Router generates route
+      # types -- LayoutProps, PageProps -- into .next/types, and layout.tsx
+      # uses LayoutProps<"/">. Locally .next is left over from a previous
+      # build so tsc finds them; on a clean checkout it does not, and the
+      # typecheck fails with "Cannot find name 'LayoutProps'". That is CI
+      # being right and the local run being lucky.
+      - name: Generate route types
+        run: npx next typegen
+
       - name: Typecheck
         run: npx tsc --noEmit
 
