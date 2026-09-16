@@ -573,6 +573,19 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
+    # This build is no longer developed. It is a thin client over the same
+    # API as the web app, so everything the server does -- scoring, résumé
+    # parsing, report generation -- is identical and current. What it does
+    # not have is the newer interface and the account-deletion screen, and
+    # it will keep falling further behind. Saying so here is more honest
+    # than letting someone discover it by missing a feature.
+    st.info(
+        "This is the older build. The current app is at "
+        "[reflectinterview.vercel.app](https://reflectinterview.vercel.app) — "
+        "same account, same data.",
+        icon="↗",
+    )
+
     # ── Account (optional — anonymous use works exactly the same without it) ──
     for _k, _v in {"auth_token": None, "auth_user": None}.items():
         if _k not in st.session_state:

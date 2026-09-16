@@ -12,6 +12,7 @@
 // at once rather than each component checking for itself.
 
 import type { CSSProperties } from "react";
+import { useSlowRequest } from "@/lib/hooks";
 
 export function scoreColor(score: number | null | undefined): string {
   if (score == null) return "var(--ri-text-mute)";
@@ -335,14 +336,34 @@ export function Spinner({ label }: { label?: string }) {
  *  the same latency, and in a product built to feel like a conversation that
  *  difference is worth carrying in the UI. */
 export function Thinking({ label = "Considering your answer" }: { label?: string }) {
+  // Times itself rather than taking a prop: this component only exists
+  // while something is loading, so mount duration IS request duration, and
+  // every call site gets the cold-start explanation without wiring a timer
+  // through six pages.
+  //
+  // The API sleeps on Render's free tier, and the first request after an
+  // idle period spends 30-50 seconds starting a container before it begins
+  // any work. Unexplained, that is indistinguishable from a hang -- people
+  // reload, which starts the wait over.
+  const slow = useSlowRequest(true, 5000);
+
   return (
-    <div role="status" className="flex items-center gap-2.5 text-sm text-ri-text-mute">
-      <span className="ri-think flex items-center gap-1" aria-hidden>
-        <span className="h-1.5 w-1.5 rounded-full bg-ri-text-mute" />
-        <span className="h-1.5 w-1.5 rounded-full bg-ri-text-mute" />
-        <span className="h-1.5 w-1.5 rounded-full bg-ri-text-mute" />
-      </span>
-      {label}
+    <div role="status" className="text-sm text-ri-text-mute">
+      <div className="flex items-center gap-2.5">
+        <span className="ri-think flex items-center gap-1" aria-hidden>
+          <span className="h-1.5 w-1.5 rounded-full bg-ri-text-mute" />
+          <span className="h-1.5 w-1.5 rounded-full bg-ri-text-mute" />
+          <span className="h-1.5 w-1.5 rounded-full bg-ri-text-mute" />
+        </span>
+        {label}
+      </div>
+      {slow && (
+        <p className="ri-enter mt-2 text-xs">
+          The server sleeps when idle and is starting back up — this first request
+          can take up to a minute. Reloading restarts the wait, so it&apos;s worth
+          sitting through.
+        </p>
+      )}
     </div>
   );
 }

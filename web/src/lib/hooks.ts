@@ -94,3 +94,39 @@ export function useHealth() {
 
   return { health, checked };
 }
+
+/**
+ * True once something has been loading for longer than a request has any
+ * business taking.
+ *
+ * The API sleeps on Render's free tier and the first request after an idle
+ * period spends 30-50 seconds starting a container before it even begins
+ * working. To the user that is indistinguishable from a hang, and the
+ * honest response to "why is this taking so long" is to say so rather than
+ * to keep spinning.
+ *
+ * Deliberately NOT a fetch timeout. Aborting at 30 seconds would kill
+ * exactly the requests that were about to succeed and would turn a slow
+ * first visit into a broken one -- the wait is real work, not a stall, so
+ * the fix is telling the user about it, not cancelling it.
+ */
+export function useSlowRequest(loading: boolean, afterMs = 4000): boolean {
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    if (!loading) return;
+    // setTimeout, not requestAnimationFrame: rAF does not fire while a tab
+    // isn't painting, and waiting out a cold start in a background tab is
+    // precisely when someone switches away.
+    const id = setTimeout(() => setSlow(true), afterMs);
+    // The reset lives in cleanup rather than in an early-return branch of
+    // the effect body -- same behaviour when `loading` goes false, but it
+    // does not set state during render-phase effect setup.
+    return () => {
+      clearTimeout(id);
+      setSlow(false);
+    };
+  }, [loading, afterMs]);
+
+  return slow;
+}

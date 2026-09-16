@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Moon, Search, Sun } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme";
 import { useHealth } from "@/lib/hooks";
 import { NAV_ITEMS } from "@/lib/nav-items";
 
@@ -27,6 +29,50 @@ function StatusDot() {
       className="h-1.5 w-1.5 shrink-0 rounded-full"
       style={{ background: ok ? "var(--ri-good-line)" : "var(--ri-stress)" }}
     />
+  );
+}
+
+/** Theme switch and palette opener.
+ *
+ *  Both exist because the palette shipped keyboard-only: Cmd/Ctrl+K was the
+ *  single way to reach either one, which on a phone is no way at all. The
+ *  search button is what makes the palette itself tappable; it carries the
+ *  shortcut in its title so desktop users learn the key exists.
+ *
+ *  Icon-only and unlabelled on purpose -- these are utilities, and giving
+ *  them words would put them in competition with the five destinations
+ *  beside them. aria-label carries the name for screen readers, and the
+ *  theme button's label says what it will DO rather than what is current,
+ *  since "Dark" alone reads as a state indicator. */
+function Utilities() {
+  const { theme, toggle } = useTheme();
+  const nextTheme = theme === "dark" ? "light" : "dark";
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => document.dispatchEvent(new CustomEvent("ri:open-palette"))}
+        aria-label="Search and jump to a page"
+        title="Search (Ctrl/Cmd + K)"
+        className="ri-focus rounded-md p-1.5 text-ri-text-mute transition-colors hover:bg-ri-surface-alt hover:text-ri-text"
+      >
+        <Search size={16} strokeWidth={1.75} aria-hidden />
+      </button>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={`Switch to ${nextTheme} theme`}
+        title={`Switch to ${nextTheme} theme`}
+        className="ri-focus rounded-md p-1.5 text-ri-text-mute transition-colors hover:bg-ri-surface-alt hover:text-ri-text"
+      >
+        {theme === "dark" ? (
+          <Sun size={16} strokeWidth={1.75} aria-hidden />
+        ) : (
+          <Moon size={16} strokeWidth={1.75} aria-hidden />
+        )}
+      </button>
+    </>
   );
 }
 
@@ -67,7 +113,8 @@ export default function Nav() {
             })}
           </nav>
 
-          <div className="flex shrink-0 items-center gap-2 text-sm">
+          <div className="flex shrink-0 items-center gap-1 text-sm sm:gap-2">
+            <Utilities />
             {user ? (
               <>
                 {/* The account page is where deletion lives, so it has to be

@@ -1,0 +1,82 @@
+# CI for both halves of the app.
+#
+# Until now the 270 backend tests only ran when someone remembered to run
+# them, and the frontend was only ever checked by whoever last ran a build
+# locally. Every regression this project has shipped would have been caught
+# by one of the four commands below.
+#
+# No secrets are needed: tests/conftest.py stubs the LLM, and the database
+# layer no-ops when DATABASE_URL is unset (services/db.is_enabled), so a
+# fork's pull request runs the full suite exactly like a push does.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch makes the first run's result irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Matches the Dockerfile and Render's runtime. A version skew here
+          # would mean CI green and production broken.
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        # requirements-backend.txt, not requirements.txt: the latter also
+        # pulls streamlit/altair/pandas/pyarrow for the legacy frontend,
+        # which nothing under test imports and which cost about a minute.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-backend.txt -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest -q
+
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # npm ci, not npm install: it installs exactly the lockfile and fails
+      # if package.json and the lock have drifted, which is itself worth
+      # catching.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint src --max-warnings=0
+
+      # The build is the real gate. tsc and eslint both pass on plenty of
+      # things Next refuses to build -- a client hook in a server component,
+      # a bad route export, a page that throws while prerendering.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_BASE: https://reflectinterview-api.onrender.com

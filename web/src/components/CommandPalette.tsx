@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Moon, Search, Sun } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav-items";
-
-const THEME_KEY = "reflectinterview_theme";
+import { initTheme, useTheme } from "@/lib/theme";
 
 type Command = {
   id: string;
@@ -16,29 +15,6 @@ type Command = {
   icon: LucideIcon;
   run: () => void;
 };
-
-/** Read the stored theme. Wrapped because localStorage throws outright in a
- *  private window rather than returning null. */
-function storedTheme(): "light" | "dark" | null {
-  try {
-    const v = localStorage.getItem(THEME_KEY);
-    return v === "dark" || v === "light" ? v : null;
-  } catch {
-    return null;
-  }
-}
-
-function applyTheme(theme: "light" | "dark") {
-  // Dark is opt-in via the data-theme attribute, deliberately NOT
-  // prefers-color-scheme: the app was following the OS setting and handing
-  // people a dark interview room they never asked for.
-  document.documentElement.setAttribute("data-theme", theme);
-  try {
-    localStorage.setItem(THEME_KEY, theme);
-  } catch {
-    /* Private window: the theme just doesn't persist. Not worth surfacing. */
-  }
-}
 
 /**
  * Cmd/Ctrl+K to jump anywhere.
@@ -57,34 +33,22 @@ export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const { theme, toggle: toggleTheme } = useTheme();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
-  // Restore the stored theme on first paint. A microtask, not rAF:
-  // requestAnimationFrame does not fire while a tab isn't painting, so a
-  // restore scheduled there silently never runs on a backgrounded tab.
+  // Reconcile the store with whatever the inline <head> script already put
+  // on <html>. A microtask, not rAF: requestAnimationFrame does not fire
+  // while a tab isn't painting, so work scheduled there silently never runs
+  // on a backgrounded tab.
   useEffect(() => {
     let cancelled = false;
     Promise.resolve().then(() => {
-      if (cancelled) return;
-      const saved = storedTheme();
-      if (saved) {
-        setTheme(saved);
-        applyTheme(saved);
-      }
+      if (!cancelled) initTheme();
     });
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  const toggleTheme = useCallback(() => {
-    setTheme((current) => {
-      const next = current === "dark" ? "light" : "dark";
-      applyTheme(next);
-      return next;
-    });
   }, []);
 
   const commands = useMemo<Command[]>(() => {
@@ -127,8 +91,23 @@ export default function CommandPalette() {
         setOpen(false);
       }
     }
+    // The header's search button opens the palette through this event
+    // rather than through shared state: the palette is mounted in the
+    // layout beside Nav, not inside it, so there is no prop path between
+    // them and lifting the open flag into a context would be three files
+    // of plumbing for one boolean.
+    function onOpenRequest() {
+      setQuery("");
+      setActive(0);
+      setOpen(true);
+    }
+
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    document.addEventListener("ri:open-palette", onOpenRequest);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("ri:open-palette", onOpenRequest);
+    };
   }, []);
 
   useEffect(() => {

@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { friendlyError, isAbortError, useAbortSignal, useHealth } from "@/lib/hooks";
+import { friendlyError, isAbortError, useAbortSignal, useHealth, useSlowRequest } from "@/lib/hooks";
 import type { CleanedResume, EvaluateResponse, ReportResponse, VoiceAnalysis } from "@/lib/types";
 import {
   Alert,
@@ -146,6 +146,7 @@ function InterviewSessionInner() {
   const [storeConsent, setStoreConsent] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
   const [setupLoading, setSetupLoading] = useState(false);
+  const setupSlow = useSlowRequest(setupLoading, 5000);
 
   // ── Interview phase state ──────────────────────────────────────────────
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -1100,6 +1101,18 @@ function InterviewSessionInner() {
           <PrimaryButton onClick={handleStart} disabled={setupLoading} className="w-full">
             {setupLoading ? "Parsing resume…" : "Start interview"}
           </PrimaryButton>
+          {/* This is the request that actually meets the cold start: it is
+              the first call a visitor makes, and the API sleeps when idle.
+              The rest of the flow explains the wait through <Thinking>,
+              which isn't rendered here -- the button carries the loading
+              state on this screen -- so the note has to be explicit. */}
+          {setupSlow && (
+            <p className="ri-enter mt-2.5 text-xs text-ri-text-mute">
+              The server sleeps when idle and is starting back up — this first request
+              can take up to a minute. Reloading restarts the wait, so it&apos;s worth
+              sitting through.
+            </p>
+          )}
         </div>
       </Card>
     </div>
