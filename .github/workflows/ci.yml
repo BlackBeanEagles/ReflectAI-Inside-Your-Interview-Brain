@@ -64,8 +64,25 @@ jobs:
       # npm ci, not npm install: it installs exactly the lockfile and fails
       # if package.json and the lock have drifted, which is itself worth
       # catching.
+      # Actions logs need a sign-in to read, so a failure here surfaces its
+      # own output in the run summary, which is public. Cheap, and it means
+      # a red build explains itself instead of requiring repo access.
       - name: Install dependencies
-        run: npm ci
+        run: |
+          set +e
+          npm ci 2>&1 | tee /tmp/npm-ci.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            {
+              echo '### npm ci failed'
+              echo ''
+              echo "node $(node -v) / npm $(npm -v)"
+              echo '```'
+              tail -60 /tmp/npm-ci.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$code"
 
       - name: Typecheck
         run: npx tsc --noEmit
