@@ -61,21 +61,17 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      # TEMPORARY diagnostic. Logs and run summaries both need a sign-in
-      # even on a public repo, but check ANNOTATIONS are public and a
-      # ::error:: workflow command creates one -- so npm's own message is
-      # emitted that way. paste joins the lines with a tilde because a
-      # workflow command is single-line. Removed once answered.
-      - name: "diag: report npm ci failure as an annotation"
-        run: |
-          set +e
-          npm ci > /tmp/out.log 2>&1
-          code=$?
-          if [ "$code" -ne 0 ]; then
-            msg=$(head -c 1200 /tmp/out.log | paste -sd '~' -)
-            echo "::error title=npm ci failed::${msg}"
-            exit 1
-          fi
+      # npm ci, not npm install: it installs exactly the lockfile and fails
+      # if package.json and the lock have drifted, which is itself worth
+      # catching. That check is also why this job first failed: the lockfile
+      # was generated on Windows, and npm omits the optional wasm32
+      # dependencies (@emnapi/core, @emnapi/runtime) that @img/sharp-wasm32
+      # and @tailwindcss/oxide-wasm32-wasi pull in, so it installed fine on
+      # Windows and was genuinely incomplete for Linux. Regenerating the
+      # lockfile fixed it. Keep this on npm ci so the same drift is caught
+      # rather than papered over by npm install rewriting the lock.
+      - name: Install dependencies
+        run: npm ci
 
       - name: Typecheck
         run: npx tsc --noEmit
