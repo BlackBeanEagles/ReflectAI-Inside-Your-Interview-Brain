@@ -212,13 +212,20 @@ def run_interview_step(
             )
         elif current_round == "hr":
             context = _build_hr_context(cleaned_data, role)
-            question = generate_hr_question(context, language=language)
+            # The HR round had no avoid-list at all, so it re-asked the
+            # same behavioural question in different words: the context it
+            # is given barely changes between turns, so nothing else varied
+            # the output.
+            question = generate_hr_question(
+                context, language=language, asked_questions=asked_questions
+            )
         elif current_round == "stress":
             stress_result = generate_stress_question(
                 skills=cleaned_data.get("skills", []),
                 difficulty=decision["difficulty"],
                 role=role,
                 language=language,
+                asked_questions=asked_questions,
             )
             question = stress_result["question"]
             question_type = stress_result.get("question_type", "rapid")

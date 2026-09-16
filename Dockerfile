@@ -26,4 +26,16 @@ USER appuser
 ENV PORT=8000
 EXPOSE 8000
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+# --forwarded-allow-ips is what makes the rate limiter work at all on a
+# hosted deployment. Every request arrives through the platform's proxy, so
+# without it request.client.host is that proxy for EVERY visitor -- the
+# per-IP limiter then shares one 20-requests-per-minute bucket across the
+# entire user base, and a handful of people interviewing at once start
+# throttling each other. uvicorn ignores X-Forwarded-For unless the
+# immediate peer is trusted, and it trusts only 127.0.0.1 by default.
+#
+# "*" is safe specifically because the container is not publicly routable:
+# the platform's proxy is the only thing that can reach it, so the header
+# cannot be spoofed by a client. On a host where the app is directly
+# reachable this must be the proxy's real address instead.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*'"]

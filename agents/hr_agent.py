@@ -11,14 +11,19 @@ Architecture:
 
 import re
 import logging
-from typing import Optional
+from typing import List, Optional
 
+from agents._prompt_bits import avoid_block
 from utils.llm import call_llm
 
 logger = logging.getLogger(__name__)
 
 
-def _build_prompt(context: str, language: Optional[str] = None) -> str:
+def _build_prompt(
+    context: str,
+    language: Optional[str] = None,
+    asked_questions: Optional[List[str]] = None,
+) -> str:
     """
     Builds a structured, production-grade prompt that turns the LLM into
     a controlled HR interviewer — not a random text generator.
@@ -47,7 +52,7 @@ Your ONLY task is to ask ONE behavioral interview question based on the candidat
 
 Candidate Context:
 {context}
-
+{avoid_block(asked_questions)}
 Rules — follow every rule strictly:
 - Ask ONLY one question. Never two.
 - Do NOT include any explanation, introduction, or label before the question.
@@ -56,6 +61,7 @@ Rules — follow every rule strictly:
 - Do NOT answer the question yourself.
 - Do NOT put the question inside quotation marks.
 - Make it realistic and situation-based — rooted in the candidate's background above.
+- Ask about a DIFFERENT situation from any already listed above.
 - Focus on past behavior, experience, attitude, or personality — NOT technical skills.
 - The question must end with a question mark (?).
 {starter_rule}{language_rule}
@@ -109,7 +115,11 @@ def _clean_output(raw: str) -> str:
     return cleaned.strip()
 
 
-def generate_hr_question(context: str, language: Optional[str] = None) -> str:
+def generate_hr_question(
+    context: str,
+    language: Optional[str] = None,
+    asked_questions: Optional[List[str]] = None,
+) -> str:
     """
     Main HR Agent function.
 
@@ -120,6 +130,10 @@ def generate_hr_question(context: str, language: Optional[str] = None) -> str:
         context:  Resume summary, job role, or candidate background.
         language: Optional interview-content language (e.g. "Spanish").
             None (default) means English — unchanged prior behavior.
+        asked_questions: Questions already asked this interview, verbatim.
+            Without these the round happily re-asks the same behavioural
+            question in different words -- the HR context barely changes
+            between turns, so nothing else varies the output.
 
     Returns:
         A single clean behavioral HR interview question.
@@ -131,7 +145,7 @@ def generate_hr_question(context: str, language: Optional[str] = None) -> str:
         logger.warning("HR Agent received empty context — returning fallback question.")
         return "Can you tell me about yourself and what motivates you professionally?"
 
-    prompt = _build_prompt(context.strip(), language)
+    prompt = _build_prompt(context.strip(), language, asked_questions)
     raw_response = call_llm(prompt, purpose="question")
 
     # If LLM utility returned an error string, pass it through without cleaning

@@ -15,29 +15,28 @@
 
 import { useSyncExternalStore } from "react";
 
+import { writeString } from "./safe-storage";
+
 export type Theme = "light" | "dark";
 
 const THEME_KEY = "reflectinterview_theme";
 
-let current: Theme = "light";
+// Seeded from the DOM at module load rather than defaulting to "light".
+// The inline <head> script has already applied the stored choice by the
+// time this module evaluates on the client, so reading the attribute is
+// both correct and cheaper than a second localStorage round-trip -- and
+// it means the very first client render of the header shows the right
+// icon. Starting at "light" and correcting in an effect made a dark-theme
+// user briefly see a moon labelled "Switch to dark theme" while already
+// in dark. On the server document is undefined and "light" is right,
+// since that is also what getServerSnapshot reports for hydration.
+let current: Theme =
+  typeof document !== "undefined" &&
+  document.documentElement.getAttribute("data-theme") === "dark"
+    ? "dark"
+    : "light";
+
 const listeners = new Set<() => void>();
-
-function readStored(): Theme | null {
-  try {
-    const v = localStorage.getItem(THEME_KEY);
-    return v === "dark" || v === "light" ? v : null;
-  } catch {
-    // A private window throws here rather than returning null.
-    return null;
-  }
-}
-
-/** Sync the store to whatever the inline <head> script already applied, so
- *  the first render matches the DOM instead of flashing back to light. */
-function syncFromDocument(): Theme {
-  if (typeof document === "undefined") return "light";
-  return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-}
 
 function subscribe(fn: () => void): () => void {
   listeners.add(fn);
@@ -57,11 +56,9 @@ function getServerSnapshot(): Theme {
 export function setTheme(theme: Theme): void {
   current = theme;
   document.documentElement.setAttribute("data-theme", theme);
-  try {
-    localStorage.setItem(THEME_KEY, theme);
-  } catch {
-    // Private window: the choice just doesn't persist. Not worth surfacing.
-  }
+  // A private window can't persist the choice; the theme still applies for
+  // this tab, which is the part the user actually asked for.
+  writeString(THEME_KEY, theme);
   listeners.forEach((fn) => fn());
 }
 
@@ -73,17 +70,4 @@ export function toggleTheme(): void {
 export function useTheme(): { theme: Theme; toggle: () => void } {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   return { theme, toggle: toggleTheme };
-}
-
-/** Called once on mount by the palette. Reconciles the module store with
- *  what the inline script put on <html> before React ever ran. */
-export function initTheme(): void {
-  const fromDom = syncFromDocument();
-  const stored = readStored();
-  const resolved = stored ?? fromDom;
-  if (resolved !== current || fromDom !== resolved) {
-    current = resolved;
-    document.documentElement.setAttribute("data-theme", resolved);
-    listeners.forEach((fn) => fn());
-  }
 }

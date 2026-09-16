@@ -113,12 +113,37 @@ _RATE_LIMITED_PATHS = (
 )
 _request_log: dict = defaultdict(deque)
 
+# Nothing used to remove a key from _request_log, so every client IP that
+# ever posted kept an entry for the life of the process -- including the
+# empty deques left behind once a visitor stopped. That is unbounded
+# growth driven by traffic on a public endpoint, and trivially accelerated
+# by anyone rotating addresses. Sweeping on a request counter rather than
+# on a timer keeps it dependency-free and costs one modulo per request;
+# the sweep itself is O(tracked IPs) and runs once every few hundred.
+_RATE_LIMIT_SWEEP_EVERY = 500
+_sweep_counter = 0
+
+
+def _sweep_rate_limit_log(now: float) -> None:
+    """Drop buckets with nothing left inside the current window."""
+    stale = [ip for ip, b in _request_log.items()
+             if not b or now - b[-1] > RATE_LIMIT_WINDOW_S]
+    for ip in stale:
+        del _request_log[ip]
+
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     if request.method == "POST" and request.url.path.startswith(_RATE_LIMITED_PATHS):
         client_ip = request.client.host if request.client else "unknown"
         now = time.monotonic()
+
+        global _sweep_counter
+        _sweep_counter += 1
+        if _sweep_counter >= _RATE_LIMIT_SWEEP_EVERY:
+            _sweep_counter = 0
+            _sweep_rate_limit_log(now)
+
         bucket = _request_log[client_ip]
         while bucket and now - bucket[0] > RATE_LIMIT_WINDOW_S:
             bucket.popleft()

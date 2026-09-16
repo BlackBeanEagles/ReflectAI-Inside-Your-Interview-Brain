@@ -20,6 +20,7 @@ import random
 import logging
 from typing import List, Optional
 
+from agents._prompt_bits import avoid_block
 from utils.llm import call_llm
 
 logger = logging.getLogger(__name__)
@@ -71,29 +72,6 @@ Rules — follow every rule strictly:
 Output only the question — nothing else:"""
 
 
-def _avoid_block(asked_questions: Optional[List[str]]) -> str:
-    """
-    Renders previously-asked questions as an explicit avoid-list.
-
-    used_skills alone was never enough to stop repetition: it filters which
-    SKILL gets picked, but the model has no idea what it already said, so it
-    would re-ask the same thing about the same project in different words.
-    Showing it the actual questions is the only signal that can prevent that.
-
-    Capped at the last 8. The whole point of the technical round is that the
-    prompt stays small and fast; an unbounded transcript would grow every
-    turn and is not needed to spot a near-duplicate.
-    """
-    recent = [q.strip() for q in (asked_questions or []) if q and q.strip()][-8:]
-    if not recent:
-        return ""
-    listed = "\n".join(f"  - {q}" for q in recent)
-    return (
-        "\nAlready asked in this interview — do NOT ask any of these again, "
-        "and do not rephrase them:\n" + listed + "\n"
-    )
-
-
 def _build_context_prompt(
     skills: List[str],
     project: str,
@@ -116,7 +94,7 @@ Your task is to ask ONE technical question based on the candidate's real project
 Candidate Skills: {skills_str}
 Candidate Project: {project}
 Difficulty: {difficulty}
-{role_line}{_avoid_block(asked_questions)}
+{role_line}{avoid_block(asked_questions)}
 Rules — follow every rule strictly:
 - Ask about an aspect of the project that has NOT already been covered above.
 - Ask ONLY one question. Never two.

@@ -21,6 +21,7 @@ import random
 import re
 from typing import List, Optional
 
+from agents._prompt_bits import avoid_block
 from utils.llm import call_llm
 
 logger = logging.getLogger(__name__)
@@ -69,6 +70,7 @@ def _normalise_difficulty(difficulty: str) -> str:
 def _build_prompt(
     skills: List[str], difficulty: str, question_type: str,
     role: Optional[str] = None, language: Optional[str] = None,
+    asked_questions: Optional[List[str]] = None,
 ) -> str:
     skills_text = ", ".join(skills) if skills else "general programming"
     role_line = f"Target role: {role}\n" if role else ""
@@ -86,7 +88,7 @@ Your task:
 Candidate Skills: {skills_text}
 Difficulty: {difficulty}
 Question Type: {question_type}
-{role_line}{language_line}
+{role_line}{language_line}{avoid_block(asked_questions)}
 Output only the question."""
 
 
@@ -126,6 +128,7 @@ def generate_stress_question(
     question_type: Optional[str] = None,
     role: Optional[str] = None,
     language: Optional[str] = None,
+    asked_questions: Optional[List[str]] = None,
 ) -> dict:
     """
     Generate one rapid-fire stress-round question.
@@ -153,7 +156,8 @@ def generate_stress_question(
         question_type = random.choice(QUESTION_TYPES)
 
     prompt = _build_prompt(
-        skills=skills, difficulty=difficulty, question_type=question_type, role=role, language=language,
+        skills=skills, difficulty=difficulty, question_type=question_type, role=role,
+        language=language, asked_questions=asked_questions,
     )
     raw_response = call_llm(prompt, purpose="question")
 

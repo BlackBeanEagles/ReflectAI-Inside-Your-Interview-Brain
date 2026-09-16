@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Moon, Search, Sun } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav-items";
-import { initTheme, useTheme } from "@/lib/theme";
+import { useTheme } from "@/lib/theme";
 
 type Command = {
   id: string;
@@ -36,20 +36,9 @@ export default function CommandPalette() {
   const { theme, toggle: toggleTheme } = useTheme();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-
-  // Reconcile the store with whatever the inline <head> script already put
-  // on <html>. A microtask, not rAF: requestAnimationFrame does not fire
-  // while a tab isn't painting, so work scheduled there silently never runs
-  // on a backgrounded tab.
-  useEffect(() => {
-    let cancelled = false;
-    Promise.resolve().then(() => {
-      if (!cancelled) initTheme();
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Whatever had focus before the palette opened, so it can be handed back.
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   const commands = useMemo<Command[]>(() => {
     const nav = NAV_ITEMS.map((item) => ({
@@ -110,8 +99,59 @@ export default function CommandPalette() {
     };
   }, []);
 
+  // Focus in on open, and back out on close.
+  //
+  // Without the restore, dismissing the palette left focus on <body>: a
+  // keyboard user's next Tab started again from the top of the document,
+  // which after a dismissal that changed nothing is a surprising place to
+  // land. Storing the previously focused element is the only way to put
+  // it back, since by the time we close it is long gone.
   useEffect(() => {
-    if (open) inputRef.current?.focus();
+    if (!open) return;
+    returnFocusRef.current = document.activeElement as HTMLElement | null;
+    inputRef.current?.focus();
+    return () => {
+      returnFocusRef.current?.focus?.();
+      returnFocusRef.current = null;
+    };
+  }, [open]);
+
+  // A dialog with aria-modal="true" claims to contain focus, so it has to
+  // actually do it -- otherwise Tab walks into the page behind, where a
+  // screen reader has already been told nothing exists.
+  useEffect(() => {
+    if (!open) return;
+    function onTab(e: KeyboardEvent) {
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+        'input, button, [href], [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeEl = document.activeElement;
+      if (e.shiftKey && (activeEl === first || !dialogRef.current.contains(activeEl))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && activeEl === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onTab);
+    return () => document.removeEventListener("keydown", onTab);
+  }, [open]);
+
+  // Hold the page still underneath. Scrolling the results list otherwise
+  // scrolls the page behind it once the list hits its end, and the page is
+  // left somewhere else entirely when the palette closes.
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
   }, [open]);
 
   // Keep the highlighted row in view when arrowing past the visible edge.
@@ -147,6 +187,7 @@ export default function CommandPalette() {
       role="presentation"
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"

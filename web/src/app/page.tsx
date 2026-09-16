@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -1177,24 +1177,59 @@ function ScoreVerdict({
   const [note, setNote] = useState("");
   const [noteSent, setNoteSent] = useState(false);
 
-  function send(v: "fair" | "unfair", withNote?: string) {
-    if (!sessionId) return;
+  // Exactly one request per answer, ever.
+  //
+  // The first version posted on the "off the mark" click and posted AGAIN
+  // when a note was added, so every complaint that bothered to explain
+  // itself was counted twice -- in precisely the number this feature
+  // exists to produce. Now "unfair" only opens the note box, and the one
+  // request goes out when the note is submitted.
+  //
+  // The cost of deferring is a verdict that could be lost if the user
+  // moves on without touching the box, so the pending verdict is flushed
+  // on unmount too. The ref is what both paths check: state would be stale
+  // inside the unmount cleanup, and a second send is the bug being fixed.
+  const sentRef = useRef(false);
+  const pendingRef = useRef<"fair" | "unfair" | null>(null);
+  const noteRef = useRef("");
+
+  const post = useCallback(
+    (v: "fair" | "unfair", withNote?: string) => {
+      if (sentRef.current || !sessionId) return;
+      sentRef.current = true;
+      api
+        .sendAnswerFeedback(
+          {
+            session_id: sessionId,
+            verdict: v,
+            question: question ?? undefined,
+            round_type: round,
+            final_score: score,
+            note: withNote?.trim() || undefined,
+          },
+          token,
+        )
+        .catch(() => {
+          /* Best-effort. A rating is not worth an error banner mid-interview. */
+        });
+    },
+    [sessionId, question, round, score, token],
+  );
+
+  // Flush a verdict the user chose but never submitted a note for -- they
+  // hit "Next question" instead, which unmounts this.
+  useEffect(() => {
+    return () => {
+      if (pendingRef.current) post(pendingRef.current, noteRef.current);
+    };
+  }, [post]);
+
+  function choose(v: "fair" | "unfair") {
     setVerdict(v);
-    api
-      .sendAnswerFeedback(
-        {
-          session_id: sessionId,
-          verdict: v,
-          question: question ?? undefined,
-          round_type: round,
-          final_score: score,
-          note: withNote?.trim() || undefined,
-        },
-        token,
-      )
-      .catch(() => {
-        /* Best-effort. A rating is not worth an error banner mid-interview. */
-      });
+    // "Fair" has nothing to add, so it goes immediately. "Unfair" waits
+    // for the note box, and the unmount flush covers it if none comes.
+    if (v === "fair") post(v);
+    else pendingRef.current = v;
   }
 
   if (verdict === null) {
@@ -1203,14 +1238,14 @@ function ScoreVerdict({
         <span>Was this score fair?</span>
         <button
           type="button"
-          onClick={() => send("fair")}
+          onClick={() => choose("fair")}
           className="ri-verdict-chip"
         >
           <ThumbsUp size={13} strokeWidth={1.75} aria-hidden /> Fair
         </button>
         <button
           type="button"
-          onClick={() => send("unfair")}
+          onClick={() => choose("unfair")}
           className="ri-verdict-chip"
         >
           <ThumbsDown size={13} strokeWidth={1.75} aria-hidden /> Off the mark
@@ -1228,7 +1263,10 @@ function ScoreVerdict({
             type="text"
             value={note}
             maxLength={500}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(e) => {
+              setNote(e.target.value);
+              noteRef.current = e.target.value;
+            }}
             placeholder="What did it miss? (optional)"
             className="ri-focus flex-1 rounded-[var(--ri-radius-control)] border border-ri-border bg-ri-surface px-2.5 py-1.5 text-xs text-ri-text outline-none"
           />
@@ -1236,7 +1274,8 @@ function ScoreVerdict({
             type="button"
             className="ri-verdict-chip shrink-0"
             onClick={() => {
-              if (note.trim()) send("unfair", note);
+              pendingRef.current = null;
+              post("unfair", note);
               setNoteSent(true);
             }}
           >
