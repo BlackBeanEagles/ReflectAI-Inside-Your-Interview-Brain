@@ -61,28 +61,35 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
+      # TEMPORARY diagnostics. Actions logs and run summaries both need a
+      # sign-in even on a public repo, but step CONCLUSIONS are readable
+      # unauthenticated -- so each check below encodes one yes/no answer
+      # about why npm ci fails here but not locally. Removed once answered.
+      - name: "diag: cwd is web"
+        continue-on-error: true
+        run: test "$(basename "$PWD")" = "web"
+
+      - name: "diag: lockfile present"
+        continue-on-error: true
+        run: test -f package-lock.json
+
+      - name: "diag: node is 22"
+        continue-on-error: true
+        run: node -v | grep -q "^v22"
+
+      - name: "diag: registry reachable"
+        continue-on-error: true
+        run: npm ping
+
+      - name: "diag: lock and manifest in sync"
+        continue-on-error: true
+        run: npm ci --dry-run
+
       # npm ci, not npm install: it installs exactly the lockfile and fails
       # if package.json and the lock have drifted, which is itself worth
       # catching.
-      # Actions logs need a sign-in to read, so a failure here surfaces its
-      # own output in the run summary, which is public. Cheap, and it means
-      # a red build explains itself instead of requiring repo access.
       - name: Install dependencies
-        run: |
-          set +e
-          npm ci 2>&1 | tee /tmp/npm-ci.log
-          code=${PIPESTATUS[0]}
-          if [ "$code" -ne 0 ]; then
-            {
-              echo '### npm ci failed'
-              echo ''
-              echo "node $(node -v) / npm $(npm -v)"
-              echo '```'
-              tail -60 /tmp/npm-ci.log
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
-          exit "$code"
+        run: npm ci
 
       - name: Typecheck
         run: npx tsc --noEmit
