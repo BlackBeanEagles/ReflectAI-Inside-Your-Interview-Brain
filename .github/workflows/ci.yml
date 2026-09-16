@@ -61,33 +61,66 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      # TEMPORARY diagnostics. Actions logs and run summaries both need a
-      # sign-in even on a public repo, but step CONCLUSIONS are readable
-      # unauthenticated -- so each check below encodes one yes/no answer
-      # about why npm ci fails here but not locally. Removed once answered.
-      - name: "diag: cwd is web"
+      # TEMPORARY diagnostics. Logs and run summaries need a sign-in even on
+      # a public repo, but step CONCLUSIONS are public -- so npm's output is
+      # captured once and each grep below turns one possible error code into
+      # a readable pass/fail. Removed once answered.
+      - name: "diag: capture npm ci output"
         continue-on-error: true
-        run: test "$(basename "$PWD")" = "web"
+        run: npm ci > /tmp/out.log 2>&1 || true
 
-      - name: "diag: lockfile present"
+      - name: "diag: log is non-empty"
         continue-on-error: true
-        run: test -f package-lock.json
+        run: test -s /tmp/out.log
 
-      - name: "diag: node is 22"
+      - name: "diag: ebadplatform"
         continue-on-error: true
-        run: node -v | grep -q "^v22"
+        run: grep -qi "EBADPLATFORM" /tmp/out.log
 
-      - name: "diag: registry reachable"
+      - name: "diag: eusage"
         continue-on-error: true
-        run: npm ping
+        run: grep -qi "EUSAGE" /tmp/out.log
 
-      - name: "diag: lock and manifest in sync"
+      - name: "diag: enotempty"
         continue-on-error: true
-        run: npm ci --dry-run
+        run: grep -qi "ENOTEMPTY" /tmp/out.log
 
-      # npm ci, not npm install: it installs exactly the lockfile and fails
-      # if package.json and the lock have drifted, which is itself worth
-      # catching.
+      - name: "diag: ebadengine"
+        continue-on-error: true
+        run: grep -qi "EBADENGINE" /tmp/out.log
+
+      - name: "diag: eresolve"
+        continue-on-error: true
+        run: grep -qi "ERESOLVE" /tmp/out.log
+
+      - name: "diag: e404"
+        continue-on-error: true
+        run: grep -qi "E404" /tmp/out.log
+
+      - name: "diag: eacces"
+        continue-on-error: true
+        run: grep -qi "EACCES" /tmp/out.log
+
+      - name: "diag: eintegrity"
+        continue-on-error: true
+        run: grep -qi "EINTEGRITY" /tmp/out.log
+
+      - name: "diag: enospc"
+        continue-on-error: true
+        run: grep -qi "ENOSPC" /tmp/out.log
+
+      - name: "diag: exit-handler-never-called"
+        continue-on-error: true
+        run: grep -qi "Exit handler never called" /tmp/out.log
+
+      - name: "diag: cannot-read"
+        continue-on-error: true
+        run: grep -qi "Cannot read" /tmp/out.log
+
+      - name: "diag: maximum-call-stack"
+        continue-on-error: true
+        run: grep -qi "Maximum call stack" /tmp/out.log
+
       - name: Install dependencies
         run: npm ci
 
