@@ -61,6 +61,12 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
+      # Before npm ci, because npm ci's own failure for this is a wall of
+      # usage text with one "Missing: X from lock file" line buried in it,
+      # and this repo's Actions logs need a sign-in to read at all.
+      - name: Check the lockfile is complete
+        run: node scripts/check-lockfile.mjs
+
       # npm ci, not npm install: it installs exactly the lockfile and fails
       # if package.json and the lock have drifted, which is itself worth
       # catching. That check is also why this job first failed: the lockfile
