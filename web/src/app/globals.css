@@ -456,6 +456,30 @@ body {
 /* Small pill button used by the "was this score fair?" row. Quiet by
    default -- it sits under the scores and must not compete with "Next
    question" -- and only picks up the accent on hover. */
+/* Off-screen until focused. Hiding it with display:none would take it
+   out of the tab order entirely, which defeats the point. */
+.ri-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 60;
+  padding: 0.6rem 1rem;
+  border-radius: 0 0 var(--ri-radius-control) 0;
+  background: var(--ri-accent);
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.ri-skip-link:focus {
+  left: 0;
+}
+
+/* The main landmark takes focus from the skip link, but it is not a
+   control -- an outline around the whole page would be misleading. */
+#main:focus {
+  outline: none;
+}
+
 .ri-verdict-chip {
   display: inline-flex;
   align-items: center;

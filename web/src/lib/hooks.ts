@@ -130,3 +130,41 @@ export function useSlowRequest(loading: boolean, afterMs = 4000): boolean {
 
   return slow;
 }
+
+/**
+ * Moves focus to a result once it arrives.
+ *
+ * Attach the returned ref to the container that holds the result, and
+ * give that container tabIndex={-1} so it can receive focus without
+ * becoming a tab stop of its own.
+ *
+ * Without this, submitting a form leaves focus on the submit button and
+ * the answer renders below it: a keyboard or screen-reader user has to
+ * tab forward through whatever else is on the page to find the thing
+ * they just asked for, with no indication of how far away it is. The
+ * live-region announcement (lib/announce.ts) says it arrived; this is
+ * what puts the user in front of it.
+ *
+ * `preventScroll` because the container is already in view -- letting the
+ * browser scroll to it as well produces a jump that a sighted keyboard
+ * user reads as the page losing its place.
+ */
+export function useResultFocus<T extends HTMLElement>(ready: boolean) {
+  const ref = useRef<T>(null);
+  const focusedFor = useRef(false);
+
+  useEffect(() => {
+    if (!ready) {
+      focusedFor.current = false;
+      return;
+    }
+    // Only on the transition into ready, not on every re-render while a
+    // result is on screen -- stealing focus back mid-read would be worse
+    // than never moving it.
+    if (focusedFor.current) return;
+    focusedFor.current = true;
+    ref.current?.focus({ preventScroll: true });
+  }, [ready]);
+
+  return ref;
+}

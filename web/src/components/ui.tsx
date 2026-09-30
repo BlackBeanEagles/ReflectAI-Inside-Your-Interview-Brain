@@ -29,7 +29,10 @@ export const ROUND_ACCENT: Record<string, string> = {
   stress: "var(--ri-stress)",
 };
 
-const ROUND_LABEL: Record<string, string> = {
+// Exported because the screen-reader announcements need the same words the
+// badge shows. Announcing the raw API value made "hr round" come out as
+// "h r round".
+export const ROUND_LABEL: Record<string, string> = {
   hr: "HR round",
   technical: "Technical round",
   stress: "Stress round",
@@ -131,12 +134,21 @@ export function Card({
   children,
   className = "",
   flush = false,
+  ref,
+  tabIndex,
+  "aria-label": ariaLabel,
 }: {
   children: React.ReactNode;
   className?: string;
   /** Drop the padding, for a card holding a full-bleed table, image or
    *  clickable header that should reach the card's edges. */
   flush?: boolean;
+  /** For result cards that take focus when their content arrives -- pair
+   *  it with tabIndex={-1} so the card can be focused without becoming a
+   *  tab stop. See useResultFocus. */
+  ref?: React.Ref<HTMLDivElement>;
+  tabIndex?: number;
+  "aria-label"?: string;
 }) {
   // Padded by default. A previous version made callers wrap content in a
   // separate <CardBody>, which meant every card that forgot to became a
@@ -144,6 +156,9 @@ export function Card({
   // pages did exactly that. Defaults should be what most callers want.
   return (
     <div
+      ref={ref}
+      tabIndex={tabIndex}
+      aria-label={ariaLabel}
       className={`rounded-ri-card border border-ri-border bg-ri-surface shadow-[var(--ri-shadow)] ${
         flush ? "" : "p-5"
       } ${className}`}

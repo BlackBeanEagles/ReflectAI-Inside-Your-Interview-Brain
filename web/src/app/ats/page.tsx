@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import * as api from "@/lib/api";
-import { friendlyError, isAbortError, useAbortSignal, usePageTitle } from "@/lib/hooks";
+import { friendlyError, isAbortError, useAbortSignal, usePageTitle, useResultFocus } from "@/lib/hooks";
+import { announce } from "@/lib/announce";
 import { Alert, Card, PrimaryButton, TextArea } from "@/components/ui";
 import { scoreColor } from "@/components/ui";
 import { ResumePicker } from "@/components/ResumePicker";
@@ -16,6 +17,7 @@ export default function AtsScorePage() {
   const [file, setFile] = useState<File | null>(null);
   const [wantRecruiterTake, setWantRecruiterTake] = useState(false);
   const [result, setResult] = useState<ATSScoreResponse | null>(null);
+  const resultRef = useResultFocus<HTMLDivElement>(result !== null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nextCheckSignal = useAbortSignal();
@@ -47,6 +49,11 @@ export default function AtsScorePage() {
         signal,
       );
       setResult(res);
+      // A number and a rating is the whole headline; the breakdown below
+      // is for reading, not for hearing read out.
+      announce(
+        `ATS score ready: ${res.overall_score.toFixed(0)} out of 100, rated ${res.rating}.`,
+      );
     } catch (err) {
       // Superseded by a re-click while this was still in flight -- the
       // newer call already owns loading/result state, so this stale one
@@ -124,7 +131,7 @@ export default function AtsScorePage() {
       </Card>
 
       {result && (
-        <Card className="ri-enter">
+        <Card className="ri-enter" ref={resultRef} tabIndex={-1} aria-label="ATS score result">
           <div className="text-center mb-5">
             <div className="text-5xl font-extrabold" style={{ color: scoreColor(result.overall_score / 10) }}>
               {result.overall_score.toFixed(0)}

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import * as api from "@/lib/api";
-import { friendlyError, isAbortError, useAbortSignal, usePageTitle } from "@/lib/hooks";
+import { friendlyError, isAbortError, useAbortSignal, usePageTitle, useResultFocus } from "@/lib/hooks";
+import { announce } from "@/lib/announce";
 import { Alert, Card, PrimaryButton, ScorePanel, SecondaryButton, Spinner, TextArea } from "@/components/ui";
 import { ResumePicker } from "@/components/ResumePicker";
 import type { CleanedResume, EvaluateResponse } from "@/lib/types";
@@ -13,6 +14,7 @@ export default function ResumeAnalysisPage() {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [cleaned, setCleaned] = useState<CleanedResume | null>(null);
+  const cleanedRef = useResultFocus<HTMLDivElement>(cleaned !== null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +47,13 @@ export default function ResumeAnalysisPage() {
         signal,
       );
       setCleaned(result.cleaned);
+      // The counts are the useful part: they are how someone notices the
+      // parser missed half their resume.
+      const c = result.cleaned;
+      announce(
+        `Resume parsed: ${c.skills.length} skills, ${c.projects.length} projects, ` +
+          `${c.experience.length} experience entries.`,
+      );
     } catch (err) {
       if (isAbortError(err)) return;
       setError(friendlyError(err));
@@ -147,7 +156,7 @@ export default function ResumeAnalysisPage() {
       {loading && <Spinner label="Parsing resume…" />}
 
       {cleaned && (
-        <Card className="ri-enter">
+        <Card className="ri-enter" ref={cleanedRef} tabIndex={-1} aria-label="Extracted resume data">
           <h2 className="font-bold mb-3">Extracted data</h2>
           <div className="grid sm:grid-cols-3 gap-4 text-sm">
             <div>

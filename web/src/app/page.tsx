@@ -4,7 +4,8 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { friendlyError, isAbortError, useAbortSignal, useHealth, useSlowRequest } from "@/lib/hooks";
+import { friendlyError, isAbortError, useAbortSignal, useHealth, useResultFocus, useSlowRequest } from "@/lib/hooks";
+import { announce } from "@/lib/announce";
 import type { CleanedResume, EvaluateResponse, ReportResponse, VoiceAnalysis } from "@/lib/types";
 import {
   Alert,
@@ -12,6 +13,7 @@ import {
   PrimaryButton,
   ProgressTrack,
   ROUND_ACCENT,
+  ROUND_LABEL,
   RoundBadge,
   RoundProgress,
   ScorePanel,
@@ -174,6 +176,9 @@ function InterviewSessionInner() {
   const [answer, setAnswer] = useState("");
   const [evaluated, setEvaluated] = useState(false);
   const [evalResult, setEvalResult] = useState<EvaluateResponse | null>(null);
+  // Focus lands on the feedback when it arrives; without it the user is
+  // left on the "Evaluate answer" button with the result rendered below.
+  const evalRef = useResultFocus<HTMLDivElement>(evalResult !== null);
   const [evalLoading, setEvalLoading] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
 
@@ -439,6 +444,11 @@ function InterviewSessionInner() {
 
       setCurrentQuestion(result.question);
       setAskedQuestions((prev) => [...prev, result.question]);
+      // The question itself, not a summary of it -- it is short, and it is
+      // the one piece of text the user cannot proceed without having read.
+      announce(
+        `${ROUND_LABEL[result.round] || result.round}, question ${result.count}. ${result.question}`,
+      );
       setRound(result.round);
       setCount(result.count);
       setDifficulty(result.difficulty);
@@ -524,6 +534,14 @@ function InterviewSessionInner() {
       );
       setEvalResult(result);
       setEvaluated(true);
+      if (!result.error) {
+        // Score plus the single most actionable line. The full breakdown
+        // stays on screen to be read rather than recited.
+        announce(
+          `Scored ${result.final_score.toFixed(1)} out of 10. ` +
+            `Improvement: ${result.feedback.improvement}`,
+        );
+      }
 
       const responseTime = questionStartedAt ? (Date.now() - questionStartedAt) / 1000 : undefined;
       if (!result.error) {
@@ -969,7 +987,12 @@ function InterviewSessionInner() {
               {evalError && <div className="mt-3"><Alert kind="error">{evalError}</Alert></div>}
 
               {evalResult && (
-                <div className="ri-enter mt-6 space-y-5 border-t border-ri-border pt-5">
+                <div
+                  ref={evalRef}
+                  tabIndex={-1}
+                  aria-label="Answer feedback and scores"
+                  className="ri-enter mt-6 space-y-5 border-t border-ri-border pt-5 outline-none"
+                >
                   {/* Feedback first, scores second. What actually helps someone
                       improve is "you paused before the result" -- the number is
                       a summary of that, not a replacement for it. Leading with

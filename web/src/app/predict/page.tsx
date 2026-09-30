@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import * as api from "@/lib/api";
-import { friendlyError, isAbortError, useAbortSignal, usePageTitle } from "@/lib/hooks";
+import { friendlyError, isAbortError, useAbortSignal, usePageTitle, useResultFocus } from "@/lib/hooks";
+import { announce } from "@/lib/announce";
 import { Alert, Card, PrimaryButton, TextArea, TextField } from "@/components/ui";
 import { ResumePicker } from "@/components/ResumePicker";
 import type { PredictedQuestionItem } from "@/lib/types";
@@ -23,6 +24,7 @@ export default function PredictedQuestionsPage() {
   const [count, setCount] = useState(10);
   const [questions, setQuestions] = useState<PredictedQuestionItem[] | null>(null);
   const [requested, setRequested] = useState(10);
+  const resultRef = useResultFocus<HTMLDivElement>(questions !== null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nextPredictSignal = useAbortSignal();
@@ -53,6 +55,10 @@ export default function PredictedQuestionsPage() {
       } else {
         setQuestions(result.questions);
         setRequested(result.requested || count);
+        const n = result.questions.length;
+        announce(
+          `${n} ${n === 1 ? "question" : "questions"} generated, grouped by category.`,
+        );
       }
     } catch (err) {
       if (isAbortError(err)) return;
@@ -128,7 +134,7 @@ export default function PredictedQuestionsPage() {
       </Card>
 
       {questions && (
-        <Card className="ri-enter">
+        <Card className="ri-enter" ref={resultRef} tabIndex={-1} aria-label="Predicted questions">
           <p className="text-sm text-ri-text-mute mb-4">
             {questions.length === 1 ? "1 question" : `${questions.length} questions`} generated,
             grouped by category.

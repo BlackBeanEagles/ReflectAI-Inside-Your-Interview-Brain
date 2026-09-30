@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { ResumeProvider } from "@/lib/resume-context";
 import CommandPalette from "@/components/CommandPalette";
+import LiveRegion from "@/components/LiveRegion";
 import Nav from "@/components/Nav";
 import ServiceWorker from "@/components/ServiceWorker";
 import { Grain } from "@/components/Ambience";
@@ -89,9 +90,19 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ServiceWorker />
         <AuthProvider>
           <ResumeProvider>
+            {/* Nine tab stops -- logo, five nav links, search, theme,
+                and the auth links -- sat between the top of every page and
+                its content. The link is off-screen until focused, which is
+                the first thing a keyboard user reaches. */}
+            <a href="#main" className="ri-skip-link">
+              Skip to content
+            </a>
             <Nav />
             <CommandPalette />
-            <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6">{children}</main>
+            <LiveRegion />
+            <main id="main" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6">
+              {children}
+            </main>
             <footer className="mt-8 border-t border-ri-border py-6 text-center text-xs text-ri-text-mute">
               Adaptive multi-round interview and session report
             </footer>
