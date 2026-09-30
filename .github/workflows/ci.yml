@@ -88,6 +88,14 @@ jobs:
       - name: Lint
         run: npx eslint src --max-warnings=0
 
+      # Component tests. Until now the frontend was gated only by tsc,
+      # eslint and the build, which catch type and compile errors and no
+      # behaviour at all -- so the feedback component's unmount flush, the
+      # one path here that silently drops data when it breaks, had no
+      # coverage of any kind.
+      - name: Test
+        run: npm test
+
       # The build is the real gate. tsc and eslint both pass on plenty of
       # things Next refuses to build -- a client hook in a server component,
       # a bad route export, a page that throws while prerendering.
