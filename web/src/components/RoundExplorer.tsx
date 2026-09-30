@@ -155,11 +155,21 @@ export default function RoundExplorer() {
         })}
       </div>
 
+      {/* data-room is the app's own escalation mechanism: it swaps the
+          radius, leading, motion duration and surface tokens wholesale.
+          Until now it was only reachable by actually triggering a stress
+          round mid-interview, which most visitors never see. Applying it
+          to the preview lets the landing page demonstrate the thing the
+          product is actually about -- clicking "Stress round" tightens
+          the corners, shortens the line spacing and speeds the
+          transitions, so the pressure is legible before you commit a
+          resume. */}
       <div
         role="tabpanel"
         id={`round-panel-${active}`}
         aria-labelledby={`round-tab-${active}`}
-        className="p-5"
+        data-room={active === "stress" ? "stress" : undefined}
+        className="p-5 transition-[border-radius] duration-300"
       >
         {/* key={active} restarts the entrance animation on every switch, so
             the panel reads as replaced rather than silently rewritten. */}
@@ -168,8 +178,8 @@ export default function RoundExplorer() {
             {round.key === "report" ? "Example finding" : "Example question"}
           </p>
           <p
-            className="border-l-2 pl-4 text-[15px] leading-relaxed"
-            style={{ borderLeftColor: accent }}
+            className="ri-ruled ri-ruled-margin py-1 pr-2 text-[15px]"
+            style={{ "--ri-margin-color": accent } as React.CSSProperties}
           >
             {round.question}
           </p>

@@ -22,6 +22,7 @@ import {
   Thinking,
 } from "@/components/ui";
 import ReportView from "@/components/ReportView";
+import AnswerPacing from "@/components/AnswerPacing";
 import ScoreVerdict from "@/components/ScoreVerdict";
 import { ResumePicker } from "@/components/ResumePicker";
 import RoundExplorer from "@/components/RoundExplorer";
@@ -865,9 +866,19 @@ function InterviewSessionInner() {
               </div>
               {/* The rule takes the active round's colour, so the escalation
                   shows in the question itself, not only in the label above it. */}
+              {/* Ruled paper, not another flat block of body text: the
+                  question is the one thing on this screen that someone is
+                  saying to you, and an interview is somebody writing you
+                  down while you answer. The coloured rule on the left is
+                  the active round's, so the escalation shows in the
+                  question itself and not only in the label above it. */}
               <p
-                className="mt-3 border-l-2 pl-4 text-[17px] leading-relaxed"
-                style={{ borderLeftColor: ROUND_ACCENT[round] || ROUND_ACCENT.hr }}
+                className="ri-ruled ri-ruled-margin mt-3 py-1 pr-2 text-[17px]"
+                style={
+                  {
+                    "--ri-margin-color": ROUND_ACCENT[round] || ROUND_ACCENT.hr,
+                  } as React.CSSProperties
+                }
               >
                 {currentQuestion}
               </p>
@@ -898,6 +909,8 @@ function InterviewSessionInner() {
                     </>
                   }
                 />
+
+                <AnswerPacing text={answer} />
 
                 <div className="flex flex-wrap items-center gap-2">
                   {!recording ? (

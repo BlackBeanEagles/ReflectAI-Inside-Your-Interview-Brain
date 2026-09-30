@@ -59,6 +59,17 @@
      something for the eye to look at. Both are near-threshold on purpose:
      you should notice the page has a surface, not notice a pattern. */
   --ri-grid: rgba(28, 26, 23, 0.07);
+
+  /* The notepad. An interview is, concretely, someone writing things down
+     about you while you talk -- so the surfaces that carry a spoken
+     question are ruled paper with a margin rule, rather than another
+     plain card. Drawn with gradients, so there is no image to load, it
+     recolours with the theme, and it costs nothing at any size.
+     --ri-rule-step must equal the line-height of the text sitting on it
+     or the words drift off the lines. */
+  --ri-rule: rgba(28, 26, 23, 0.075);
+  --ri-rule-margin: rgba(179, 34, 63, 0.28);
+  --ri-rule-step: 1.75rem;
   --ri-grid-size: 22px;
   --ri-wash: color-mix(in srgb, var(--ri-accent) 16%, transparent);
   --ri-wash-2: color-mix(in srgb, var(--ri-tech) 11%, transparent);
@@ -139,6 +150,8 @@
   --ri-track: #272c35;
 
   --ri-grid: rgba(255, 255, 255, 0.045);
+  --ri-rule: rgba(255, 255, 255, 0.07);
+  --ri-rule-margin: rgba(240, 113, 133, 0.3);
   --ri-grid-size: 22px;
   --ri-wash: color-mix(in srgb, var(--ri-accent) 12%, transparent);
   --ri-wash-2: color-mix(in srgb, var(--ri-tech) 8%, transparent);
@@ -478,6 +491,55 @@ body {
    control -- an outline around the whole page would be misleading. */
 #main:focus {
   outline: none;
+}
+
+/* Ruled paper. The last stop is 1px so the line is hairline at any zoom
+   rather than scaling with the step. */
+.ri-ruled {
+  position: relative;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--ri-rule-step) - 1px),
+    var(--ri-rule) calc(var(--ri-rule-step) - 1px),
+    var(--ri-rule) var(--ri-rule-step)
+  );
+  /* Anchor the rules to the first text baseline instead of the box top,
+     so the words sit ON the lines. */
+  background-position: 0 0.35rem;
+  line-height: var(--ri-rule-step);
+  /* A notepad has ruled lines whether or not you have filled them. A
+     one-line question on a box sized to one line shows a single hairline
+     and reads as an underline, not as paper -- the motif only lands with
+     a few empty lines under the text. */
+  min-height: calc(var(--ri-rule-step) * 3);
+}
+
+/* The margin rule a notepad has down its left edge. Its colour is the
+   stress accent at low alpha -- the same red the interview escalates
+   into, so the page's palette is already saying where this goes. */
+.ri-ruled-margin {
+  padding-left: 1.4rem;
+}
+.ri-ruled-margin::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0.6rem;
+  width: 1.5px;
+  /* Callers set --ri-margin-color to the active round's accent, so this
+     single line does the job the old separate coloured border did: the
+     escalation reads in the margin rule itself rather than in a second
+     stripe beside it. */
+  background: var(--ri-margin-color, var(--ri-rule-margin));
+  transition: background-color var(--ri-motion) ease;
+}
+
+/* The stress room tightens everything else, so it tightens the ruling
+   too: narrower lines, less air, the same text under more pressure. */
+[data-room="stress"] .ri-ruled {
+  --ri-rule-step: 1.5rem;
 }
 
 .ri-verdict-chip {
