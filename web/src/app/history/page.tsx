@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import * as api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { friendlyError, usePageTitle } from "@/lib/hooks";
-import { Alert, Card, SecondaryButton, Spinner } from "@/components/ui";
+import { Alert, Card, SecondaryButton, Spinner, scoreColor } from "@/components/ui";
 import type { UserReportItem } from "@/lib/types";
 import ReportView from "@/components/ReportView";
+import RoundPath from "@/components/RoundPath";
 import ScoreTrendChart from "@/components/ScoreTrendChart";
 
 export default function HistoryPage() {
@@ -105,7 +107,7 @@ export default function HistoryPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="ri-display text-3xl">Interview History Dashboard</h1>
+        <h1 className="ri-display text-3xl">Your interview history</h1>
         <p className="ri-prose mt-2 text-sm text-ri-text-mute">
           Showing saved sessions for <b>{user.name || user.email}</b> — only sessions you opted in
           to saving during setup appear here.
@@ -153,70 +155,73 @@ export default function HistoryPage() {
             </p>
           </Card>
 
-          <Card>
-            <h3 className="font-bold text-sm mb-3">All saved sessions</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-ri-text-mute border-b border-ri-border">
-                    <th className="py-2 pr-3">#</th>
-                    <th className="py-2 pr-3">Date</th>
-                    <th className="py-2 pr-3">Overall</th>
-                    <th className="py-2 pr-3">HR</th>
-                    <th className="py-2 pr-3">Technical</th>
-                    <th className="py-2 pr-3">Stress</th>
-                    <th className="py-2 pr-3">Questions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...chronological].reverse().map((item, i) => (
-                    <tr key={item.session_id} className="border-b border-ri-border last:border-0">
-                      <td className="py-2 pr-3">{chronological.length - i}</td>
-                      <td className="py-2 pr-3">{item.created_at.slice(0, 16).replace("T", " ")}</td>
-                      <td className="py-2 pr-3">{item.report.overall_score?.toFixed(1) ?? "—"}</td>
-                      <td className="py-2 pr-3">{item.report.hr_score?.toFixed(1) ?? "—"}</td>
-                      <td className="py-2 pr-3">{item.report.technical_score?.toFixed(1) ?? "—"}</td>
-                      <td className="py-2 pr-3">{item.report.stress_score?.toFixed(1) ?? "—"}</td>
-                      <td className="py-2 pr-3">{item.report.total_questions}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          {/* One list, not two. Every session used to appear twice: once
+              as a row in a table of scores, and again directly below as an
+              expandable card with the same date and the same overall
+              score. The table's per-round columns also printed "—" for any
+              round a session never reached, which reads as missing data
+              when for the stress round it is the normal outcome.
 
-          <div>
-            <h3 className="font-bold text-sm mb-3">Session details</h3>
-            <div className="space-y-2">
-              {history.map((item) => {
+              Each row now carries the path its session took, so scanning
+              the list answers the question the columns could not: which
+              of these sessions went into a stress round, and did that
+              stop happening as you practised. */}
+          <section>
+            <h3 className="mb-3 text-sm font-bold">Your sessions</h3>
+            <ol className="space-y-2">
+              {[...chronological].reverse().map((item, i) => {
+                const n = chronological.length - i;
                 const isOpen = expanded === item.session_id;
                 const overall = item.report.overall_score;
                 const panelId = `session-detail-${item.session_id}`;
                 return (
-                  <Card key={item.session_id} flush className="overflow-hidden">
-                    <button
-                      onClick={() => setExpanded(isOpen ? null : item.session_id)}
-                      aria-expanded={isOpen}
-                      aria-controls={panelId}
-                      className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-ri-surface-alt"
-                    >
-                      <span className="text-sm font-medium">
-                        {item.created_at.slice(0, 16).replace("T", " ")} — Overall{" "}
-                        {overall != null ? `${overall.toFixed(1)}/10` : "N/A"} ·{" "}
-                        {item.report.total_questions} questions
-                      </span>
-                      <span className="text-ri-text-mute" aria-hidden="true">{isOpen ? "▲" : "▼"}</span>
-                    </button>
-                    {isOpen && (
-                      <div id={panelId} className="px-4 pb-4 pt-1 border-t border-ri-border">
-                        <ReportView report={item.report} />
-                      </div>
-                    )}
-                  </Card>
+                  <li key={item.session_id}>
+                    <Card flush className="overflow-hidden">
+                      <button
+                        onClick={() => setExpanded(isOpen ? null : item.session_id)}
+                        aria-expanded={isOpen}
+                        aria-controls={panelId}
+                        className="ri-focus grid w-full grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 px-4 py-3 text-left transition-colors hover:bg-ri-surface-alt sm:grid-cols-[2.5rem_9rem_4.5rem_1fr_auto]"
+                      >
+                        <span className="text-xs tabular-nums text-ri-text-mute">#{n}</span>
+                        <span className="text-sm">
+                          {item.created_at.slice(0, 16).replace("T", " ")}
+                        </span>
+                        <span
+                          className="text-sm font-semibold tabular-nums"
+                          style={{ color: scoreColor(overall) }}
+                        >
+                          {overall != null ? overall.toFixed(1) : "N/A"}
+                        </span>
+                        <span className="col-span-2 min-w-0 sm:col-span-1">
+                          <RoundPath
+                            compact
+                            hr={item.report.hr_score}
+                            technical={item.report.technical_score}
+                            stress={item.report.stress_score}
+                          />
+                        </span>
+                        <span className="hidden items-center gap-2 text-xs text-ri-text-mute sm:flex">
+                          {item.report.total_questions} q
+                          <ChevronDown
+                            size={14}
+                            strokeWidth={1.75}
+                            aria-hidden
+                            className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+                          />
+                        </span>
+                      </button>
+                      {isOpen && (
+                        <div id={panelId} className="border-t border-ri-border px-4 pb-4 pt-4">
+                          <ReportView report={item.report} />
+                        </div>
+                      )}
+                    </Card>
+                  </li>
                 );
               })}
-            </div>
-          </div>
+            </ol>
+          </section>
         </>
       )}
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReportResponse } from "@/lib/types";
+import RoundPath from "./RoundPath";
 import { ScorePanel } from "./ui";
 
 const COMPARISON_LABELS: Record<string, string> = {
@@ -37,18 +38,26 @@ export default function ReportView({ report }: { report: ReportResponse }) {
 
   return (
     <div className="space-y-6">
-      {/* ── Overall performance ── */}
+      {/* ── How the interview went ──
+          The overall score, then the route the session took. Four equal
+          panels used to sit here, which presented a conditional round as
+          if it were a parallel one -- and drew an unreached stress round
+          as an empty ring, i.e. as a missing or failed result. */}
       <section>
-        <h3 className="font-bold text-sm uppercase tracking-wide text-ri-text-mute mb-3">
-          Overall Performance
-        </h3>
-        <div className="flex gap-3 flex-wrap">
-          <ScorePanel label="Overall" score={report.overall_score} />
-          <ScorePanel label="HR Round" score={report.hr_score} round="hr" />
-          <ScorePanel label="Technical" score={report.technical_score} round="technical" />
-          <ScorePanel label="Stress" score={report.stress_score} round="stress" />
+        <p className="ri-eyebrow mb-3">How the interview went</p>
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-8">
+          <div className="sm:w-36 sm:shrink-0">
+            <ScorePanel label="Overall" score={report.overall_score} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <RoundPath
+              hr={report.hr_score}
+              technical={report.technical_score}
+              stress={report.stress_score}
+            />
+          </div>
         </div>
-        <p className="text-xs text-ri-text-mute mt-2">
+        <p className="mt-3 text-xs text-ri-text-mute">
           Based on {report.total_questions} evaluated answer{report.total_questions !== 1 ? "s" : ""}
         </p>
       </section>
@@ -70,7 +79,11 @@ export default function ReportView({ report }: { report: ReportResponse }) {
                     className="text-xl font-extrabold"
                     style={{ color: flat ? "var(--ri-text-mute)" : up ? "var(--ri-good-line)" : "var(--ri-stress)" }}
                   >
-                    {flat ? "" : up ? "" : ""} {data.delta > 0 ? "+" : ""}
+                    {/* This used to be preceded by {flat ? "" : up ? "" : ""} --
+                        what was left of an up/down glyph after the emoji
+                        were removed, still rendering a stray space before
+                        every number. The sign already carries direction. */}
+                    {data.delta > 0 ? "+" : ""}
                     {data.delta.toFixed(1)}
                   </div>
                   <div className="text-xs text-ri-text-mute uppercase tracking-wide font-semibold mt-1">
@@ -117,12 +130,17 @@ export default function ReportView({ report }: { report: ReportResponse }) {
         </section>
       )}
 
-      {/* ── Summary ── */}
+      {/* ── The interviewer's note ──
+          The same ruled paper the questions were asked on. During the
+          interview the page showed you being written down; this is what
+          got written. That continuity is the point -- a tinted info box
+          said "system message", which is not what a debrief is. */}
       {report.summary && (
         <section>
-          <div className="bg-ri-info-bg border border-ri-info-line rounded-xl p-4 text-sm leading-relaxed">
+          <p className="ri-eyebrow mb-2">Interviewer&apos;s note</p>
+          <p className="ri-ruled ri-ruled-margin py-1 pr-2 text-[15px] text-ri-text">
             {report.summary}
-          </div>
+          </p>
         </section>
       )}
 
@@ -186,21 +204,26 @@ export default function ReportView({ report }: { report: ReportResponse }) {
         </section>
       )}
 
-      {/* ── Strengths / weaknesses / patterns / recommendations ── */}
-      {allStrengths.length > 0 && (
-        <ListSection title="Strengths" items={allStrengths} kind="strength" />
-      )}
-      {allWeaknesses.length > 0 && (
-        <ListSection title="Weaknesses" items={allWeaknesses} kind="weakness" />
+      {/* ── Debrief notes ──
+          Strengths, weaknesses and recommendations were three stacks of
+          coloured boxes -- green, amber, purple -- which is how a dashboard
+          reports status, not how an interviewer reports on a person. They
+          are one ruled sheet now, marked in the margin the way someone
+          annotates notes: + for what landed, − for what did not, → for
+          what to do next. The marks are symbols first and colour second,
+          so the distinction survives greyscale and colour-blindness. */}
+      {(allStrengths.length > 0 || allWeaknesses.length > 0 || report.recommendations.length > 0) && (
+        <DebriefNotes
+          strengths={allStrengths}
+          weaknesses={allWeaknesses}
+          recommendations={report.recommendations}
+        />
       )}
       {/* "Patterns Detected" is cut rather than restyled: it repeated the
           Strengths and Weaknesses lists above it in different wording, and
           from a single evaluated answer the report was stating two facts in
           six boxes. Anything genuinely new in report.patterns still reaches
           the reader through the behavioural paragraph. */}
-      {report.recommendations.length > 0 && (
-        <ListSection title="Recommendations" items={report.recommendations} kind="rec" />
-      )}
     </div>
   );
 }
@@ -287,15 +310,60 @@ function ListItem({ kind, children }: { kind: ItemKind; children: React.ReactNod
   );
 }
 
-function ListSection({ title, items, kind }: { title: string; items: string[]; kind: ItemKind }) {
+const NOTE_MARKS = {
+  strength: { mark: "+", color: "var(--ri-good-line)", heading: "What landed" },
+  weakness: { mark: "−", color: "var(--ri-warn-line)", heading: "What didn't" },
+  rec: { mark: "→", color: "var(--ri-accent)", heading: "Next time" },
+} as const;
+
+function DebriefNotes({
+  strengths,
+  weaknesses,
+  recommendations,
+}: {
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: string[];
+}) {
+  const groups = (
+    [
+      ["strength", strengths],
+      ["weakness", weaknesses],
+      ["rec", recommendations],
+    ] as const
+  ).filter(([, items]) => items.length > 0);
+
   return (
     <section>
-      <h3 className="font-bold text-sm mb-2">{title}</h3>
-      <ul className="space-y-1.5">
-        {items.map((item, i) => (
-          <ListItem key={i} kind={kind}>{item}</ListItem>
-        ))}
-      </ul>
+      <p className="ri-eyebrow mb-2">Debrief notes</p>
+      <div className="ri-ruled ri-ruled-margin pb-1 pr-2 text-sm text-ri-text">
+        {groups.map(([kind, items]) => {
+          const { mark, color, heading } = NOTE_MARKS[kind];
+          return (
+            // Headings and items are one rule-step tall each, so every line
+            // of text -- including wrapped ones -- sits on a rule.
+            <div key={kind}>
+              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ri-text-mute">
+                {heading}
+              </h3>
+              <ul>
+                {items.map((item, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span
+                      aria-hidden
+                      className="w-3 shrink-0 text-center font-semibold"
+                      style={{ color }}
+                    >
+                      {mark}
+                    </span>
+                    <span className="min-w-0">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }
