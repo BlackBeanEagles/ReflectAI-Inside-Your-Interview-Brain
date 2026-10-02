@@ -7,6 +7,7 @@ import { announce } from "@/lib/announce";
 import { Alert, Card, PrimaryButton, TextArea } from "@/components/ui";
 import { scoreColor } from "@/components/ui";
 import { ResumePicker } from "@/components/ResumePicker";
+import ScreenerView from "@/components/ScreenerView";
 import type { ATSScoreResponse } from "@/lib/types";
 
 export default function AtsScorePage() {
@@ -17,6 +18,10 @@ export default function AtsScorePage() {
   const [file, setFile] = useState<File | null>(null);
   const [wantRecruiterTake, setWantRecruiterTake] = useState(false);
   const [result, setResult] = useState<ATSScoreResponse | null>(null);
+  // The text exactly as it was scored. Highlighting the live textarea
+  // instead would mark edits made after scoring against results that were
+  // never computed for them.
+  const [scoredText, setScoredText] = useState<string | null>(null);
   const resultRef = useResultFocus<HTMLDivElement>(result !== null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +54,7 @@ export default function AtsScorePage() {
         signal,
       );
       setResult(res);
+      setScoredText(method === "paste" ? text.trim() : null);
       // A number and a rating is the whole headline; the breakdown below
       // is for reading, not for hearing read out.
       announce(
@@ -166,12 +172,20 @@ export default function AtsScorePage() {
               </div>
             ))}
           </div>
-          <p className="text-xs text-ri-text-mute mb-4">ℹ️ {result.methodology}</p>
+          <p className="text-xs text-ri-text-mute mb-4">{result.methodology}</p>
 
           {result.recruiter_take && (
-            <div className="bg-ri-purple-bg border border-ri-purple-line rounded-xl p-4 text-sm mb-5">
-              <b>Recruiter&apos;s first read (AI-generated, subjective — not part of the score above)</b>
-              <p className="mt-1">{result.recruiter_take}</p>
+            <div className="mb-6">
+              <p className="ri-eyebrow mb-1">Recruiter&apos;s first read</p>
+              <p className="mb-2 text-xs text-ri-text-mute">
+                AI-generated and subjective — not part of the score above.
+              </p>
+              <p
+                className="ri-ruled ri-ruled-margin py-1 pr-2 text-sm text-ri-text"
+                style={{ "--ri-margin-color": "var(--ri-accent)" } as React.CSSProperties}
+              >
+                {result.recruiter_take}
+              </p>
             </div>
           )}
 
@@ -185,26 +199,20 @@ export default function AtsScorePage() {
             ))}
           </div>
 
-          {result.has_job_description && result.keyword_importance.length > 0 && (
-            <>
-              <h3 className="font-bold text-sm mb-2">Keyword importance</h3>
-              <div className="space-y-1.5 mb-5">
-                {result.keyword_importance.slice(0, 12).map((kw, i) => (
-                  <div key={i} className="flex items-center gap-3 text-sm">
-                    <span className={`w-24 sm:w-40 shrink-0 truncate ${kw.matched ? "" : "text-ri-text-mute"}`}>
-                      {kw.matched ? "" : ""} {kw.keyword}
-                    </span>
-                    <div className="flex-1 h-2 rounded-full bg-ri-track overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-ri-accent"
-                        style={{ width: `${kw.importance_pct}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
+          {/* Keyword match, shown on the document instead of as a list of
+              percentage bars -- see ScreenerView. Those bars also carried a
+              dead {kw.matched ? "" : ""} left from removed emoji, which put
+              a stray space in front of every keyword. */}
+          {result.has_job_description &&
+            result.matched_keywords.length + result.missing_keywords.length > 0 && (
+              <div className="mb-6">
+                <ScreenerView
+                  text={scoredText}
+                  matched={result.matched_keywords}
+                  missing={result.missing_keywords}
+                />
               </div>
-            </>
-          )}
+            )}
 
           {result.improvement_plan.length > 0 && (
             <div>
@@ -215,7 +223,6 @@ export default function AtsScorePage() {
               </p>
               <ul className="space-y-2">
                 {result.improvement_plan.map((item, i) => {
-                  const icon = item.priority === "high" ? "" : item.priority === "medium" ? "" : "";
                   const style =
                     item.priority === "high"
                       ? "bg-ri-warn-bg border-ri-warn-line"
@@ -224,7 +231,7 @@ export default function AtsScorePage() {
                         : "bg-ri-good-bg border-ri-good-line";
                   return (
                     <li key={i} className={`text-sm px-3 py-2 rounded-lg border ${style}`}>
-                      <b>{icon} +{item.estimated_gain.toFixed(1)} pts [{item.category}]</b> — {item.action}
+                      <b>+{item.estimated_gain.toFixed(1)} pts [{item.category}]</b> — {item.action}
                       <div className="text-xs opacity-80 mt-0.5">{item.reason} · Effort: {item.effort}</div>
                     </li>
                   );

@@ -154,8 +154,13 @@ export interface ATSCategory {
 }
 
 export interface ATSKeywordItem {
+  /** Normalised matching key -- can read oddly ("redi" for Redis). */
   keyword: string;
   weight: number;
+  /** How the job posting wrote it. Show this, not keyword. */
+  label?: string | null;
+  /** How the résumé wrote it, for highlighting. Empty for misses. */
+  found_as?: string[];
 }
 
 export interface ATSImprovementItem {

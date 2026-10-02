@@ -139,12 +139,43 @@ _PREFERRED_CUES = re.compile(
 
 
 def _tokenize(text: str) -> List[str]:
+    return [low for _, low in _tokenize_with_surface(text)]
+
+
+def _tokenize_with_surface(text: str) -> List[Tuple[str, str]]:
+    """
+    Tokens as (surface, lowercase) pairs -- the surface is the word as it
+    was written, which is what the page shows and highlights.
+
+    Strips trailing sentence punctuation only. It used to strip "+" and "#"
+    as well, which turned C++ and C# into "c" and then dropped them as too
+    short, so the scorer could not see two of the most common languages at
+    all -- even though _SYNONYMS maps "csharp" to "c#", a lookup that could
+    never be reached.
+    """
     out = []
     for w in _WORD_RE.findall(text or ""):
-        w = w.lower().rstrip("./-#+")
-        if w:
-            out.append(w)
+        surface = w.rstrip("./-")
+        if surface:
+            out.append((surface, surface.lower()))
     return out
+
+
+# Where one list item ends and the next begins. A word pair spanning one of
+# these is two separate items, not a phrase.
+_CHUNK_SPLIT_RE = re.compile(r"[,;:()\[\]|•·▪▸\n]+")
+
+
+def _chunks(text: str) -> List[str]:
+    return [c for c in _CHUNK_SPLIT_RE.split(text or "") if c.strip()]
+
+
+def _is_candidate(token: str) -> bool:
+    # C# is two characters and C++ three, so the length floor that drops
+    # noise like "an" and "us" exempts anything carrying + or #.
+    if token in _STOPWORDS or token.isdigit():
+        return False
+    return len(token) > 2 or "+" in token or "#" in token
 
 
 def _lines(text: str) -> List[str]:
@@ -182,46 +213,70 @@ def _sentence_weight_multiplier(sentence: str) -> float:
     return 1.0
 
 
-def _extract_weighted_keywords(text: str, top_n: int = 30) -> List[Tuple[str, float]]:
+def _extract_weighted_keywords(text: str, top_n: int = 30) -> List[Tuple[str, float, str]]:
+    """
+    Weighted keywords from a job description, as (key, weight, label).
+
+    Two-word phrases are only formed inside a single list item. They used
+    to be formed across the whole sentence after punctuation was thrown
+    away, so "Required: Docker, Kubernetes, Terraform" produced the
+    "phrases" docker kubernetes and kubernetes terraform -- and with the
+    1.3x phrase boost on top of the 1.6x required boost, those outweighed
+    the actual skills. The same was done to the résumé, so listing your
+    skills in the same order as the posting raised your score.
+
+    label is the keyword as the posting wrote it. The key is normalised
+    for matching (singular, synonyms folded), which is why it can read
+    "redi" for Redis; the label is what a person should be shown.
+    """
     counts: Counter = Counter()
+    labels: Dict[str, str] = {}
     for sentence in _split_sentences(text):
         multiplier = _sentence_weight_multiplier(sentence)
-        norm = [_normalize_token(t) for t in _tokenize(sentence)]
-        unigrams = [t for t in norm if t not in _STOPWORDS and len(t) > 2 and not t.isdigit()]
-        for t in unigrams:
-            counts[t] += multiplier
-        for i in range(len(norm) - 1):
-            a, b = norm[i], norm[i + 1]
-            if a not in _STOPWORDS and b not in _STOPWORDS and len(a) > 2 and len(b) > 2:
-                counts[f"{a} {b}"] += multiplier * 1.3
+        for chunk in _chunks(sentence):
+            toks = [(surface, _normalize_token(low)) for surface, low in _tokenize_with_surface(chunk)]
+            for surface, norm in toks:
+                if _is_candidate(norm):
+                    counts[norm] += multiplier
+                    labels.setdefault(norm, surface)
+            for (s1, a), (s2, b) in zip(toks, toks[1:]):
+                if _is_candidate(a) and _is_candidate(b):
+                    key = f"{a} {b}"
+                    counts[key] += multiplier * 1.3
+                    labels.setdefault(key, f"{s1} {s2}")
     ranked = counts.most_common(top_n)
-    return [(kw, round(w, 1)) for kw, w in ranked]
+    return [(kw, round(w, 1), labels[kw]) for kw, w in ranked]
 
 
 # ── Per-category scorers ────────────────────────────────────────────────────
 # Each returns (score_0_to_100, [check_dict, ...]).
 
 def _score_keyword_match(resume_text: str, job_description: str) -> Tuple[float, List[Dict], List[Dict], List[Dict]]:
-    resume_tokens_list = [_normalize_token(t) for t in _tokenize(resume_text)]
-    resume_norm_tokens = set(resume_tokens_list)
-    resume_bigrams = {
-        f"{resume_tokens_list[i]} {resume_tokens_list[i+1]}"
-        for i in range(len(resume_tokens_list) - 1)
-    }
+    # Normalised key -> the words as the résumé actually wrote them. The
+    # page highlights these, so what is marked is exactly what matched,
+    # including through synonyms (posting says Postgres, résumé says
+    # PostgreSQL).
+    resume_words: Dict[str, set] = {}
+    resume_phrases: Dict[str, set] = {}
+    for chunk in _chunks(resume_text):
+        toks = [(surface, _normalize_token(low)) for surface, low in _tokenize_with_surface(chunk)]
+        for surface, norm in toks:
+            resume_words.setdefault(norm, set()).add(surface)
+        for (s1, a), (s2, b) in zip(toks, toks[1:]):
+            resume_phrases.setdefault(f"{a} {b}", set()).add(f"{s1} {s2}")
 
     jd_keywords = _extract_weighted_keywords(job_description)
     matched, missing = [], []
     total_weight = matched_weight = 0.0
 
-    for kw, weight in jd_keywords:
+    for kw, weight, label in jd_keywords:
         total_weight += weight
-        is_phrase = " " in kw
-        found = (kw in resume_bigrams) if is_phrase else (kw in resume_norm_tokens)
-        if found:
+        found_as = (resume_phrases if " " in kw else resume_words).get(kw)
+        if found_as:
             matched_weight += weight
-            matched.append({"keyword": kw, "weight": weight})
+            matched.append({"keyword": kw, "weight": weight, "label": label, "found_as": sorted(found_as)})
         else:
-            missing.append({"keyword": kw, "weight": weight})
+            missing.append({"keyword": kw, "weight": weight, "label": label, "found_as": []})
 
     score = (matched_weight / total_weight) * 100 if total_weight else 0.0
     matched.sort(key=lambda x: -x["weight"])
@@ -542,7 +597,7 @@ def _build_improvement_plan(
             items.append({
                 "priority": "high" if gain >= 3 else ("medium" if gain >= 1 else "low"),
                 "category": "Keyword Match",
-                "action": f"Add '{kw['keyword']}' if it genuinely applies to you.",
+                "action": f"Add '{kw.get('label') or kw['keyword']}' if it genuinely applies to you.",
                 "reason": "This term appears in the job description but wasn't found in your resume.",
                 "estimated_gain": round(gain, 1),
                 "effort": _EFFORT_BY_CATEGORY["keyword_match"],
@@ -686,6 +741,7 @@ def score_resume_against_job(
         for k in sorted(all_kw, key=lambda x: -x["weight"])[:15]:
             keyword_importance.append({
                 "keyword": k["keyword"],
+                "label": k.get("label"),
                 "weight": k["weight"],
                 "importance_pct": round((k["weight"] / max_weight) * 100, 1),
                 "matched": k in matched,
@@ -714,8 +770,8 @@ def score_resume_against_job(
         "rating": rating,
         "has_job_description": has_jd,
         "categories": categories_out,
-        "matched_keywords": matched[:20],
-        "missing_keywords": missing[:15],
+        "matched_keywords": matched,
+        "missing_keywords": missing,
         "keyword_importance": keyword_importance,
         "section_ranking": section_ranking,
         "improvement_plan": improvement_plan,

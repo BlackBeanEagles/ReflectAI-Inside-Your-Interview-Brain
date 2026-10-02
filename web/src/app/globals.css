@@ -542,6 +542,22 @@ body {
   --ri-rule-step: 1.5rem;
 }
 
+/* A highlighter stroke across the lower part of the line, the way someone
+   skims a CV with a marker -- not a full-height box, which reads as a
+   search result. Uses <mark>, so it is announced as highlighted text. */
+.ri-highlight {
+  color: inherit;
+  background: linear-gradient(
+    to bottom,
+    transparent 38%,
+    color-mix(in srgb, var(--ri-good-line) 28%, transparent) 38%,
+    color-mix(in srgb, var(--ri-good-line) 28%, transparent) 92%,
+    transparent 92%
+  );
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
 .ri-verdict-chip {
   display: inline-flex;
   align-items: center;

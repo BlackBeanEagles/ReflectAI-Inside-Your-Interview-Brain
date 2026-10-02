@@ -5,14 +5,11 @@ import * as api from "@/lib/api";
 import { friendlyError, isAbortError, useAbortSignal, usePageTitle, useResultFocus } from "@/lib/hooks";
 import { announce } from "@/lib/announce";
 import { Alert, Card, PrimaryButton, TextArea, TextField } from "@/components/ui";
+import PrepChecklist from "@/components/PrepChecklist";
 import { ResumePicker } from "@/components/ResumePicker";
 import type { PredictedQuestionItem } from "@/lib/types";
 
-const CATEGORY_LABEL: Record<string, string> = {
-  technical: "Technical",
-  hr: "HR",
-  behavioral: "Behavioral",
-};
+
 
 export default function PredictedQuestionsPage() {
   usePageTitle("Predicted Questions — ReflectInterview");
@@ -68,12 +65,7 @@ export default function PredictedQuestionsPage() {
     }
   }
 
-  const grouped = questions
-    ? (["technical", "hr", "behavioral"] as const).map((cat) => ({
-        cat,
-        items: questions.filter((q) => q.category === cat),
-      })).filter((g) => g.items.length > 0)
-    : [];
+
 
   return (
     <div className="space-y-6">
@@ -145,23 +137,7 @@ export default function PredictedQuestionsPage() {
               </>
             )}
           </p>
-          <div className="space-y-5">
-            {grouped.map(({ cat, items }) => (
-              <div key={cat}>
-                <h3 className="font-bold text-sm mb-2">
-                  {CATEGORY_LABEL[cat]}
-                </h3>
-                <ul className="space-y-2">
-                  {items.map((q, i) => (
-                    <li key={i} className="bg-ri-purple-bg border border-ri-purple-line rounded-lg px-3 py-2.5 text-sm">
-                      <b>{q.question}</b>
-                      <div className="text-xs opacity-80 mt-1">{q.prep_tip}</div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
+          <PrepChecklist questions={questions} />
         </Card>
       )}
     </div>

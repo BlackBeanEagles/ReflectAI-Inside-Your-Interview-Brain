@@ -38,8 +38,14 @@ class ResumeParseResponse(BaseModel):
 
 
 class ATSKeywordItem(BaseModel):
+    # keyword is the normalised matching key (singular, synonyms folded) and
+    # can read oddly -- "redi" for Redis. label is how the posting wrote it,
+    # and found_as is how the résumé wrote it, for highlighting. Both are
+    # optional so older clients and stored reports still validate.
     keyword: str
     weight: float
+    label: Optional[str] = None
+    found_as: List[str] = Field(default_factory=list)
 
 
 class ATSFormatCheck(BaseModel):
@@ -68,6 +74,7 @@ class ATSImprovementItem(BaseModel):
 
 class ATSKeywordImportance(BaseModel):
     keyword: str
+    label: Optional[str] = None
     weight: float
     importance_pct: float
     matched: bool

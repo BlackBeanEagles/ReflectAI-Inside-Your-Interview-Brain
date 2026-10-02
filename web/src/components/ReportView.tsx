@@ -65,7 +65,7 @@ export default function ReportView({ report }: { report: ReportResponse }) {
       {/* ── Comparison to own past sessions ── */}
       {comparison && (
         <section>
-          <h3 className="font-bold text-sm mb-3">Compared to your past sessions</h3>
+          <h3 className="ri-eyebrow mb-3">Compared to your past sessions</h3>
           <div className="flex gap-3 flex-wrap">
             {Object.entries(comparison).map(([field, data]) => {
               const up = data.delta > 0;
@@ -102,7 +102,7 @@ export default function ReportView({ report }: { report: ReportResponse }) {
       {/* ── Voice & delivery ── */}
       {voice && (
         <section>
-          <h3 className="font-bold text-sm mb-3">Voice & Delivery</h3>
+          <h3 className="ri-eyebrow mb-3">Voice &amp; delivery</h3>
           <p className="text-xs text-ri-text-mute mb-3">
             Based on {voice.voiced_answer_count} voice-recorded answer{voice.voiced_answer_count !== 1 ? "s" : ""} in this session.
           </p>
@@ -147,7 +147,7 @@ export default function ReportView({ report }: { report: ReportResponse }) {
       {/* ── Behavioural analysis ── */}
       {(report.consistency || report.pressure_performance || report.behavior_summary || report.behavior_tags.length > 0) && (
         <section>
-          <h3 className="font-bold text-sm mb-3">Behavioural Analysis</h3>
+          <h3 className="ri-eyebrow mb-3">Behavioural analysis</h3>
           {report.behavior_tags.length > 0 && (
             <div className="flex gap-2 flex-wrap mb-3">
               {report.behavior_tags.map((t, i) => (
@@ -175,7 +175,7 @@ export default function ReportView({ report }: { report: ReportResponse }) {
       {/* ── Cognitive profile ── */}
       {cog && (
         <section>
-          <h3 className="font-bold text-sm mb-3">Cognitive Profile</h3>
+          <h3 className="ri-eyebrow mb-3">Cognitive profile</h3>
           {cog.thinking_fingerprint && (
             <dl className="mb-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
               <TraitMeter label="Analytical depth" level={cog.thinking_fingerprint.analytical_depth} />
@@ -196,9 +196,19 @@ export default function ReportView({ report }: { report: ReportResponse }) {
             </p>
           )}
           {cog.bias_summary && <p className="text-sm mb-2 italic text-ri-text-mute">{cog.bias_summary}</p>}
+          {/* A second voice, so a second note: same paper as the
+              interviewer's, with the margin rule in the accent colour so
+              the two read as written by different people. It was the last
+              tinted box left on this screen. */}
           {cog.cognitive_coach_summary && (
-            <div className="bg-ri-purple-bg border border-ri-purple-line rounded-xl p-4 text-sm mt-2">
-              {cog.cognitive_coach_summary}
+            <div className="mt-4">
+              <p className="ri-eyebrow mb-2">Coach&apos;s note</p>
+              <p
+                className="ri-ruled ri-ruled-margin py-1 pr-2 text-sm text-ri-text"
+                style={{ "--ri-margin-color": "var(--ri-accent)" } as React.CSSProperties}
+              >
+                {cog.cognitive_coach_summary}
+              </p>
             </div>
           )}
         </section>
