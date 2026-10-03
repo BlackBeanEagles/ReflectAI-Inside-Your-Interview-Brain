@@ -126,7 +126,9 @@ export default function ResumeAnalysisPage() {
       <div>
         <h1 className="ri-display text-3xl">Resume Analysis</h1>
         <p className="ri-prose mt-2 text-ri-text-mute text-sm">
-          Upload a PDF or paste text to inspect extracted data and get a technical question.
+          See exactly what the interviewer will read from your résumé before you start. The
+          questions are built from what appears here, so if a project is missing or a line has
+          been split into two, fix the résumé first.
         </p>
       </div>
 
@@ -157,7 +159,7 @@ export default function ResumeAnalysisPage() {
 
       {cleaned && (
         <Card className="ri-enter" ref={cleanedRef} tabIndex={-1} aria-label="Extracted resume data">
-          <h2 className="font-bold mb-3">Extracted data</h2>
+          <h2 className="ri-eyebrow mb-3">What the interviewer will read</h2>
           <div className="grid sm:grid-cols-3 gap-4 text-sm">
             <div>
               <p className="font-semibold text-ri-text-mute mb-1">Skills ({cleaned.skills.length})</p>
@@ -179,7 +181,7 @@ export default function ResumeAnalysisPage() {
 
           <div className="mt-5 pt-4 border-t border-ri-border">
             <PrimaryButton onClick={handleGenerateQuestion} disabled={questionLoading}>
-              {questionLoading ? "Generating…" : "Generate Question"}
+              {questionLoading ? "Writing a question…" : "Try a question from this"}
             </PrimaryButton>
           </div>
         </Card>

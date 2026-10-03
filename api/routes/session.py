@@ -223,6 +223,34 @@ def reset_session(session_id: str, current=Depends(get_optional_user)):
 
 # ─── POST /session/{session_id}/report ───────────────────────────────────────
 
+def _build_transcript(history: list) -> list:
+    """
+    The answered questions in order, trimmed to what the report shows.
+
+    Skips anything without a question or an answer rather than failing the
+    whole report on one malformed entry -- the report is the one thing a
+    finished session must always produce.
+    """
+    out = []
+    for item in history:
+        question = (item.get("question") or "").strip()
+        answer = (item.get("answer") or "").strip()
+        if not question or not answer:
+            continue
+        out.append({
+            "question": question,
+            "answer": answer,
+            "round": item.get("round") or item.get("round_type") or "",
+            "final_score": float(item.get("final_score") or 0.0),
+            "scores": item.get("scores") or {},
+            "feedback": {
+                k: v for k, v in (item.get("feedback") or {}).items()
+                if isinstance(v, str) and v.strip()
+            },
+        })
+    return out
+
+
 @router.post("/{session_id}/report", response_model=ReportResponse)
 def generate_final_report(session_id: str, current=Depends(get_optional_user)):
     """
@@ -248,6 +276,10 @@ def generate_final_report(session_id: str, current=Depends(get_optional_user)):
     )
 
     report = generate_report(history, language=session_manager.get_session_language(session_id))
+
+    # The transcript goes into the report dict itself, before saving, so a
+    # report reopened from History carries the answers it was judged on.
+    report["transcript"] = _build_transcript(history)
 
     # Compare against the user's own past sessions BEFORE saving this one,
     # so the comparison never includes the report being generated right now.
@@ -279,6 +311,7 @@ def generate_final_report(session_id: str, current=Depends(get_optional_user)):
         cognitive             = report.get("cognitive"),
         comparison            = report.get("comparison"),
         voice_insights        = report.get("voice_insights"),
+        transcript            = report.get("transcript", []),
     )
 
 

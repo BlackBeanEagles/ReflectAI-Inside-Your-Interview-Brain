@@ -103,3 +103,31 @@ describe("comparison to past sessions", () => {
     expect(screen.getByText("+1.2").textContent).toBe("+1.2");
   });
 });
+
+describe("the transcript in the report", () => {
+  const t = {
+    question: "Why Redis?",
+    answer: "For the stock cache.",
+    round: "technical",
+    final_score: 6,
+    scores: {},
+    feedback: { improvement: "Quantify it." },
+  };
+
+  it("shows the answers when the report carries them", () => {
+    render(<ReportView report={report({ transcript: [t] })} />);
+    expect(screen.getByText("Answer by answer")).toBeInTheDocument();
+    expect(screen.getByText("Why Redis?")).toBeInTheDocument();
+  });
+
+  it("explains the absence on a report saved before answers were kept", () => {
+    render(<ReportView report={report({ transcript: undefined, total_questions: 4 })} />);
+    expect(screen.getByText(/isn't available for this report/i)).toBeInTheDocument();
+  });
+
+  it("says nothing for a session with no answers at all", () => {
+    render(<ReportView report={report({ transcript: [], total_questions: 0 })} />);
+    expect(screen.queryByText("Answer by answer")).not.toBeInTheDocument();
+    expect(screen.queryByText(/isn't available/i)).not.toBeInTheDocument();
+  });
+});

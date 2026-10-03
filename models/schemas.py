@@ -530,6 +530,16 @@ class GenerateReportRequest(BaseModel):
     session_id: str
 
 
+class TranscriptItem(BaseModel):
+    """One answered question, as shown in the report's transcript."""
+    question: str
+    answer: str
+    round: str
+    final_score: float
+    scores: Dict[str, float] = Field(default_factory=dict)
+    feedback: Dict[str, str] = Field(default_factory=dict)
+
+
 class ReportResponse(BaseModel):
     """
     Output from POST /session/{session_id}/report — the final interview report.
@@ -575,6 +585,14 @@ class ReportResponse(BaseModel):
     # those answers. None (not zeros) for a session answered entirely by
     # typing. See services/voice_analysis.py.
     voice_insights: Optional[Dict[str, Any]] = None
+    # Every question with the answer given and how it was judged. The
+    # report used to be only aggregates -- a summary and lists of strengths
+    # and weaknesses -- so nobody could ever reread what they actually said
+    # next to the feedback on it, which is the single most useful thing a
+    # practice tool can show. Saved with the report (under the same storage
+    # consent as the answers themselves), so History can show it too.
+    # Reports saved before this existed have none, hence the default.
+    transcript: List["TranscriptItem"] = Field(default_factory=list)
 
 
 # ─── Week 5 Day 5 — Counterfactual replay ────────────────────────────────────

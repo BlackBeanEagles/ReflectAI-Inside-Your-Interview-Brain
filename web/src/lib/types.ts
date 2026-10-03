@@ -127,6 +127,18 @@ export interface ReportResponse {
   cognitive: CognitiveBlock | null;
   comparison: Record<string, ComparisonField> | null;
   voice_insights: VoiceInsights | null;
+  /** Every answered question, in order. Absent on reports saved before
+   *  answers were kept with them -- distinct from [] for "none answered". */
+  transcript?: TranscriptItem[];
+}
+
+export interface TranscriptItem {
+  question: string;
+  answer: string;
+  round: string;
+  final_score: number;
+  scores: Record<string, number>;
+  feedback: { strength?: string; weakness?: string; improvement?: string };
 }
 
 export interface UserReportItem {

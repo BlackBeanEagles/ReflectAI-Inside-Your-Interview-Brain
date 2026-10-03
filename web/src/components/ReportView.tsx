@@ -2,6 +2,7 @@
 
 import type { ReportResponse } from "@/lib/types";
 import RoundPath from "./RoundPath";
+import Transcript from "./Transcript";
 import { ScorePanel } from "./ui";
 
 const COMPARISON_LABELS: Record<string, string> = {
@@ -143,6 +144,19 @@ export default function ReportView({ report }: { report: ReportResponse }) {
           </p>
         </section>
       )}
+
+      {/* ── The evidence, right under the verdict ──
+          transcript is undefined only on a report saved before answers
+          were kept with it; [] means a session with nothing answered. The
+          note is worded to be true either way, including against an API
+          that has not been redeployed yet. */}
+      {report.transcript && report.transcript.length > 0 ? (
+        <Transcript items={report.transcript} />
+      ) : report.transcript === undefined && report.total_questions > 0 ? (
+        <p className="text-xs text-ri-text-mute">
+          Answer-by-answer detail isn&apos;t available for this report.
+        </p>
+      ) : null}
 
       {/* ── Behavioural analysis ── */}
       {(report.consistency || report.pressure_performance || report.behavior_summary || report.behavior_tags.length > 0) && (

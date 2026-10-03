@@ -62,7 +62,7 @@ export default function HistoryPage() {
           <p className="ri-eyebrow">What appears here</p>
           <ul className="mt-3 space-y-2 text-sm text-ri-text-mute">
             <li>A trend line of overall, HR, technical and stress scores, session by session.</li>
-            <li>Per-session reports you can reopen, with the full question-by-question breakdown.</li>
+            <li>Per-session reports you can reopen, including every question, your answer, and how it was judged.</li>
             <li>Each new report compared against your own earlier ones — never against other people.</li>
           </ul>
           <div className="mt-5 flex flex-wrap gap-2">
